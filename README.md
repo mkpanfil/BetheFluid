@@ -1,4 +1,6 @@
-# yangyang
+# PyCDB
+
+Python Can Do Bethe
 
 Provides numerical solutions to the Thermodynamic Bethe Ansatz equations.
 
