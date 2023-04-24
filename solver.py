@@ -4,14 +4,12 @@ from CalcV import CalcV
 
 class Solver():
     
-    
-    def __init__(self,steps_number,x, l, u, n0):
+    def __init__(self, steps_number, x, l, n0):
         
         self.steps_number = steps_number
         self.x = x
         self.l = l
         self.n0 = n0
-        self.u = u
         self.int_x, self.int_t = self.create_ints()      
         self.grid = self.solve_equation()
         
@@ -32,7 +30,7 @@ class Solver():
         
         l_matrix = self.l.reshape(-1,1)
         
-        n0_matrix = self.n0(self.x, l_matrix, self.u)
+        n0_matrix = self.n0(self.x, l_matrix)       
         
         grid[:,:,0] = n0_matrix
         
@@ -49,6 +47,7 @@ class Solver():
         V = CalcV(value, self.l).V
         
         x_dt = self.int_t/self.int_x * (np.roll(V*value, 1, axis = 1) - np.roll(V*value, -1, axis = 1)) + value
+
         
         return x_dt
     
@@ -71,19 +70,15 @@ class Solver():
         
     
     #plots a graph of solution for given momenta
-    def do_graph(self, step, momenta):
+    def do_graph(self, momenta):
     
         i = 0
-
-        while i <= len(self.grid[momenta,0,:]) - 1:
+        
+        step = int(round(self.steps_number/10, 0))
+        
+        while i <= self.grid.shape[2] - 1:
 
             plt.plot(self.x, self.grid[momenta,:,i], label = "t = {}".format(round(i*self.int_t, 3)))
             plt.legend()                       
             i = i + step
        
-    #used for learning
-    def trying(self):
-        
-        V = CalcV(self.grid[0,:,0])
-        
-        self.grid[0,:,0] = V.V

@@ -1,5 +1,3 @@
-# probably better alternative:
-
 class CalcV():
     
     def __init__(self, n, l):      
@@ -7,8 +5,9 @@ class CalcV():
         self.l = l
         self.V = self.create_V()
       
-    def modify_input(self):
-        pass
-    
-    def create_V(self):  
-        return 1
+    def create_V(self): 
+        
+        
+        V = 2*self.l.reshape(-1,1)     
+        
+        return V
