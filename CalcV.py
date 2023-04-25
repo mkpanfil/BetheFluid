@@ -8,6 +8,6 @@ class CalcV():
     def create_V(self): 
         
         
-        V = 2*self.l.reshape(-1,1)     
+        V = 2*self.l     
         
         return V
