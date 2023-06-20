@@ -1,22 +1,75 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from CalcV import CalcV
+
+
 
 class Solver():
     
-    def __init__(self, N, l, x, t, rho0, c):
+    def __init__(self, l = None, x = None, t = None, rho0 = None, c = None, boundary = None):
         
-        
-        self.N = N
-        self.l = l
-        self.x = x
-        self.t = t
-        self.c = c
-        self.rho0 = rho0
+               
+        self.l, self.x, self.t = self.correct_l_x_t(l, x, t)
+        self.c, self.rho0 = self.to_tuple(c, rho0)
+        self.boundary = self.correct_boundary(boundary)
         self.int_x, self.int_t, self.steps_number = self.get_ints()
         self.grid = self.create_initial_grid()
+    
+    def correct_l_x_t(self, l, x, t):
+        
+        if isinstance(x, np.ndarray) == False:
+            
+            x = np.array(x)
+        
+        if isinstance(t, np.ndarray) == False:
+            
+            t = np.array(t)
+            
+        if isinstance(l, np.ndarray) == False:
+            
+            l = np.array(l)      
+        
+        if t.size < 2:
+            
+            raise ValueError('t grid size cannot be smaller than 2')
+            
+        if l.ndim != 1 or x.ndim != 1 or t.ndim != 1:
+            
+            raise ValueError('x, l and t should be 1D arrays')
+        
+        return l, x, t
+    
+    
+    def correct_boundary(self, boundary):
+        
+        if boundary is None:
+            return None
+        
+        if isinstance(boundary, tuple) == False or len(boundary) != 2:
+            
+            raise TypeError('boundary argument should be a tuple of lenght 2')
+            
+        return boundary
+    
+    
+    # ensures that c and rho0 are tuple and have this same size
+    def to_tuple(self, c, rho0):
+        
+        if isinstance(c, tuple) == False:
+    
+            c = (c,)
         
         
+        if isinstance(rho0, tuple) == False:
+    
+            rho0 = (rho0,)
+            
+        if len(c) != len(rho0):
+            
+            raise TypeError('c and rho0 have to have this same size')
+            
+        return c, rho0
+    
+    
     # extracts required data from x,t grids  
     def get_ints(self):
         
@@ -27,31 +80,29 @@ class Solver():
         steps_number = self.t.size
         
         return int_x, int_t, steps_number
-      
-    #creates grid filled with initial condition   
-    # order of dimensions in the grid: momentum N, x, l, t
     
-    # for now N dimension is just stucking x, l, t
-    
+
+    # creates grid filled with initial condition 
     def create_initial_grid(self):
         
-        # dimensions: N, x, l, t
+        # dimensions: N, l, x, t
         
-        grid = np.zeros((self.N, self.l.size, self.x.size, self.t.size))
+        grid = np.zeros((len(self.c), self.l.size, self.x.size, self.t.size))
         
-        N = np.ones(self.N)
+        N_dim = []      
         
-        N = N[:, np.newaxis, np.newaxis]
+        for item in self.rho0:
+            
+            N = item(self.l[:, np.newaxis] , self.x[np.newaxis, :])    
         
-        rh0_matrix = self.rho0(self.l[:, np.newaxis], self.x[np.newaxis, :])
+            N_dim.append(N)
         
-        initial_state = N* rh0_matrix[np.newaxis, :, :]
+        initial_state = np.stack(N_dim)
         
         grid[Ellipsis,0] = initial_state
         
         return grid
           
-        
     
     def create_matrix(self, time):
         
@@ -87,15 +138,28 @@ class Solver():
         diagonal = np.ones_like(V_V_h)* diagonal[np.newaxis, np.newaxis, Ellipsis]
         
         matrix = diagonal + off_diagonal
+        
                
-        
-        
-        matrix[Ellipsis, 0, -1] = -V_V_h[Ellipsis, 0, -1]
-        
-        matrix[Ellipsis, -1, 0] = V_V_h[Ellipsis, -1, 0]
+        if self.boundary is None:
+            
+            matrix[Ellipsis, 0, -1] = -V_V_h[Ellipsis, 0, -1]
+            
+            matrix[Ellipsis, -1, 0] = V_V_h[Ellipsis, -1, 0]
+            
+        else:
+            
+            matrix[Ellipsis, 0, 0] = self.boundary[0]
+            
+            matrix[Ellipsis, 0, 1] = 0
+            
+            matrix[Ellipsis, -1, -1] = self.boundary[1]
+            matrix[Ellipsis, -1, -2] = 0
+            
         
         return matrix
         
+    
+    
     def solve_equation(self):
                
         
@@ -107,28 +171,6 @@ class Solver():
             
             self.grid[Ellipsis, time + 1] = np.linalg.solve(matrix, self.grid[Ellipsis, time])      
             
-       
-    
-    #graph solution for given N
-    def do_graph(self, N, l):
-    
-        i = 0
-        
-        step = int(np.ceil(self.steps_number/10))
-        
-        #grid dimensions are N, l, x, t 
-        
-        #grid = np.sum(self.grid, axis = 1)
-        
-        # after summation: N, x, t
-        
-        grid = self.grid
-        
-        while i <= self.grid.shape[-1] - 1:
-
-            plt.plot(self.x, grid[N, l, :, i], label = "t = {}".format(round(i*self.int_t, 3)))
-            plt.legend()                       
-            i = i + step
   
       
      
