@@ -44,13 +44,13 @@ class CalcV():
     
     def get_operator(self):      
         
-        # T(l,u) , n(N, x, l)
+        # T(l,u) , n(N, x, u)
         
         
         # create T*n (N,x, l, u)
         
         
-        Tn = self.T[np.newaxis, np.newaxis, :, :] * self.n[:,:,:, np.newaxis]
+        Tn = self.T[np.newaxis, np.newaxis, :, :] * self.n[:,:,np.newaxis, :]
         
         
         # create delta l,u for each N and x
