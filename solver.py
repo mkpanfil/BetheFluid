@@ -4,19 +4,21 @@ from CalcV import CalcV
 
 class Solver():
     
-    def __init__(self, t, x, l, n0):
+    def __init__(self, N, l, x, t, rho0, c):
         
-        self.t = t
-        self.x = x
+        
+        self.N = N
         self.l = l
-        self.n0 = n0
-        self.int_x, self.int_t, self.steps_number = self.create_ints()
-        self.initial_grid = self.create_initial_grid()
-        self.matrix = self.create_matrix()
-        self.grid = self.solve_equation()
+        self.x = x
+        self.t = t
+        self.c = c
+        self.rho0 = rho0
+        self.int_x, self.int_t, self.steps_number = self.get_ints()
+        self.grid = self.create_initial_grid()
+        
         
     # extracts required data from x,t grids  
-    def create_ints(self):
+    def get_ints(self):
         
         int_x = np.diff(self.x).mean()
     
@@ -27,71 +29,106 @@ class Solver():
         return int_x, int_t, steps_number
       
     #creates grid filled with initial condition   
-    # order of dimensions in the grid: momentum l, x, t
+    # order of dimensions in the grid: momentum N, x, l, t
+    
+    # for now N dimension is just stucking x, l, t
+    
     def create_initial_grid(self):
         
-        grid = np.zeros((self.l.size, self.x.size, self.steps_number))
+        # dimensions: N, x, l, t
         
-        l_matrix = self.l.reshape(-1,1)
+        grid = np.zeros((self.N, self.l.size, self.x.size, self.t.size))
         
-        n0_matrix = self.n0(self.x, l_matrix)       
+        N = np.ones(self.N)
         
-        grid[:,:,0] = n0_matrix
+        N = N[:, np.newaxis, np.newaxis]
+        
+        rh0_matrix = self.rho0(self.l[:, np.newaxis], self.x[np.newaxis, :])
+        
+        initial_state = N* rh0_matrix[np.newaxis, :, :]
+        
+        grid[Ellipsis,0] = initial_state
         
         return grid
-    
-    def create_matrix(self):       
+          
         
-        V = CalcV(self.initial_grid, self.l).V
+    
+    def create_matrix(self, time):
         
-        length = self.initial_grid[0,:,0]
+        #dimensions N, l, x for rho and V
         
-        matrices_list = []
+        rho = self.grid[Ellipsis, time]
         
-        for index in range(self.l.size): 
-            
-            r = self.int_t/(2*self.int_x) * V[index]
-    
-            h_matrix = np.zeros((len(length),len(length)))
-
-            h_matrix[0,-1], h_matrix[0,0], h_matrix[0,1]  = -r, 1, r
-
-            matrix = np.zeros((len(length), len(length)))
-    
-            for index in range(len(length)):
-    
-                matrix = np.roll(h_matrix, (index,index), axis = (0,1)) + matrix
-    
-            matrices_list.append(matrix)
-            
-        matrix = np.stack(matrices_list)  
+        
+        # calculating V using class CalcV
+        
+        V = CalcV(rho, self.l, self.c).V
+                
+        
+        h = self.int_t/2*self.int_x
+        
+        
+        V_V_h = h*V[Ellipsis,np.newaxis, :] * np.ones_like(V)[Ellipsis, np.newaxis]
+        
+        
+        off_diagonal = np.zeros((V_V_h.shape[-1], V_V_h.shape[-1]))
+             
+        
+        np.fill_diagonal(off_diagonal[:, 1:], 1)
+        np.fill_diagonal(off_diagonal[1:, 0:], -1)
+        
+        off_diagonal = V_V_h * off_diagonal[np.newaxis, np.newaxis, Ellipsis]
+        
+        
+        diagonal = np.zeros((V_V_h.shape[-1], V_V_h.shape[-1]))
+        
+        np.fill_diagonal(diagonal, 1)
+        
+        diagonal = np.ones_like(V_V_h)* diagonal[np.newaxis, np.newaxis, Ellipsis]
+        
+        matrix = diagonal + off_diagonal
+               
+        
+        
+        matrix[Ellipsis, 0, -1] = -V_V_h[Ellipsis, 0, -1]
+        
+        matrix[Ellipsis, -1, 0] = V_V_h[Ellipsis, -1, 0]
         
         return matrix
-    
+        
     def solve_equation(self):
+               
         
-        
-        grid = self.initial_grid
-        
-        for t in range(self.steps_number - 1):
+        for time in range(self.t.size - 1):
             
-            n1 = np.linalg.solve(self.matrix, self.initial_grid[:,:, t])
             
-            grid[:,:, t + 1] = n1
-      
-        return grid
+            matrix = self.create_matrix(time)
+        
+            
+            self.grid[Ellipsis, time + 1] = np.linalg.solve(matrix, self.grid[Ellipsis, time])      
+            
        
     
-    #graph solution for given momenta
-    def do_graph(self, momenta):
+    #graph solution for given N
+    def do_graph(self, N, l):
     
         i = 0
         
-        step = int(round(self.steps_number/10, 0))
+        step = int(np.ceil(self.steps_number/10))
         
-        while i <= self.grid.shape[2] - 1:
+        #grid dimensions are N, l, x, t 
+        
+        #grid = np.sum(self.grid, axis = 1)
+        
+        # after summation: N, x, t
+        
+        grid = self.grid
+        
+        while i <= self.grid.shape[-1] - 1:
 
-            plt.plot(self.x, self.grid[momenta,:,i], label = "t = {}".format(round(i*self.int_t, 3)))
+            plt.plot(self.x, grid[N, l, :, i], label = "t = {}".format(round(i*self.int_t, 3)))
             plt.legend()                       
             i = i + step
-       
+  
+      
+     
