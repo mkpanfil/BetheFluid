@@ -1,17 +1,19 @@
 import numpy as np
-from CalcV import CalcV
-
+import line_profiler
+from calc import CalcV, CalcD
+from tqdm import tqdm
 
 
 class Solver():
     
-    def __init__(self, l = None, x = None, t = None, rho0 = None, c = None, boundary = None):
+    def __init__(self, l = None, x = None, t = None, rho0 = None, c = None, boundary = None, diff = False):
         
                
         self.l, self.x, self.t = self.correct_l_x_t(l, x, t)
         self.c, self.rho0 = self.to_tuple(c, rho0)
         self.boundary = self.correct_boundary(boundary)
-        self.int_x, self.int_t, self.steps_number = self.get_ints()
+        self.int_x, self.int_t, self.int_l, self.steps_number = self.get_ints()
+        self.diff = diff
         self.grid = self.create_initial_grid()
     
     def correct_l_x_t(self, l, x, t):
@@ -70,16 +72,18 @@ class Solver():
         return c, rho0
     
     
-    # extracts required data from x,t grids  
+    # extracts required data from x,t grids
     def get_ints(self):
         
         int_x = np.diff(self.x).mean()
     
         int_t = np.diff(self.t).mean()
         
+        int_l = np.diff(self.l).mean()
+        
         steps_number = self.t.size
         
-        return int_x, int_t, steps_number
+        return int_x, int_t, int_l, steps_number
     
 
     # creates grid filled with initial condition 
@@ -115,6 +119,9 @@ class Solver():
         
         V = CalcV(rho, self.l, self.c).V
                 
+        # changing indices back to proper order
+        
+        V = np.einsum('Nxl -> Nlx', V)
         
         h = self.int_t/2*self.int_x
         
@@ -157,20 +164,81 @@ class Solver():
             
         
         return matrix
+     
         
+    def x_der(self, arr):
+              
+        der = 1/(2*self.int_x) * (np.roll(arr, 1, axis = -1) - np.roll(arr, -1, axis = -1))
+        
+        return der
     
+    
+    def diff_equ(self, time):
+        
+        if self.diff == True:
+        
+            rho = self.grid[Ellipsis, time]
+            
+            Diff = CalcD(rho, self.l, self.c)
+            
+            
+            D, V = Diff.D, Diff.V
+            
+            
+            # changing indices
+            
+            D = np.einsum('Nxlu -> Nlxu', D)
+            
+            V = np.einsum('Nxl -> Nlx', V)
+            
+            
+            first_der = np.einsum('Nlxu, Nlx -> Nlx', D, self.x_der(rho)) * self.int_l
+            
+            second_der = self.x_der(first_der)
+            
+            
+            rho_next = self.int_t * (0.5 * second_der - self.x_der(V*rho)) + rho
+            
+            return rho_next
+      
     
     def solve_equation(self):
                
-        
-        for time in range(self.t.size - 1):
+        if self.diff == False:
             
+            for time in tqdm(range(self.t.size - 1)):
+                               
+                
+                    matrix = self.create_matrix(time)
             
-            matrix = self.create_matrix(time)
-        
+                
+                    self.grid[Ellipsis, time + 1] = np.linalg.solve(matrix, self.grid[Ellipsis, time])      
             
-            self.grid[Ellipsis, time + 1] = np.linalg.solve(matrix, self.grid[Ellipsis, time])      
-            
-  
-      
+        else:
+                
+            for time in tqdm(range(self.t.size - 1)):
+                    
+                rho_next = self.diff_equ(time)
+                    
+                self.grid[Ellipsis, time + 1] = rho_next
      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
