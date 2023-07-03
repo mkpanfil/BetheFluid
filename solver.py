@@ -117,7 +117,7 @@ class Solver():
         
         # calculating V using class CalcV
         
-        V = CalcV(rho, self.l, self.c).V
+        V = CalcV(rho, self.l, self.c).get_V()
                 
         # changing indices back to proper order
         
@@ -182,7 +182,7 @@ class Solver():
             Diff = CalcD(rho, self.l, self.c)
             
             
-            D, V = Diff.D, Diff.V
+            D, V = Diff.get_D(), Diff.get_V()
             
             
             # changing indices
