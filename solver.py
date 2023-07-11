@@ -1,8 +1,7 @@
 import numpy as np
-import line_profiler
 from calc import CalcV, CalcD
 from tqdm import tqdm
-
+import pickle
 
 class Solver():
     
@@ -117,7 +116,7 @@ class Solver():
         
         # calculating V using class CalcV
         
-        V = CalcV(rho, self.l, self.c).get_V()
+        V = CalcV(rho, self.l, self.c).V
                 
         # changing indices back to proper order
         
@@ -182,7 +181,7 @@ class Solver():
             Diff = CalcD(rho, self.l, self.c)
             
             
-            D, V = Diff.get_D(), Diff.get_V()
+            D, V = Diff.D, Diff.V
             
             
             # changing indices
@@ -200,9 +199,10 @@ class Solver():
             rho_next = self.int_t * (0.5 * second_der - self.x_der(V*rho)) + rho
             
             return rho_next
-      
+     
+     
     
-    def solve_equation(self):
+    def solve_equation(self, path = None):
                
         if self.diff == False:
             
@@ -223,7 +223,10 @@ class Solver():
                 self.grid[Ellipsis, time + 1] = rho_next
      
 
-
+        if path is not None:
+            
+            with open(path, 'wb') as file:
+                pickle.dump(self.grid, file)
 
 
 
