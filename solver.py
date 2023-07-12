@@ -5,6 +5,17 @@ import pickle
 
 class Solver():
     
+    
+    # loading arrays                   
+    @staticmethod
+    def load_array(path):
+            
+        with open(path, 'rb') as file:
+            arr = pickle.load(file)
+
+        return arr
+    
+    
     def __init__(self, l = None, x = None, t = None, rho0 = None, c = None, boundary = None, diff = False):
         
                
@@ -167,39 +178,43 @@ class Solver():
         
     def x_der(self, arr):
               
-        der = 1/(2*self.int_x) * (np.roll(arr, 1, axis = -1) - np.roll(arr, -1, axis = -1))
+        #der = 1/(2*self.int_x) * (np.roll(arr, -1, axis = -1) - np.roll(arr, 1, axis = -1))
+        
+        der = np.gradient(arr, self.int_x, axis = -1)
         
         return der
     
     
+    def diff_fixed_point_func(self, rho, rho_next, D, V):
+        
+        # D, V dimensions N, x, momenta
+        
+        D_op = self.int_t/2 * np.einsum('Nxos, Nox -> Nsx', D, self.x_der(rho_next), optimize = True)       
+        
+        V_rho = np.einsum('Nxl, Nlx -> Nlx', V, rho_next, optimize = True)
+        
+        foo = self.x_der(D_op) - self.int_t * self.x_der(V_rho) + rho
+        
+        return foo
+    
+    
     def diff_equ(self, time):
         
-        if self.diff == True:
+        rho_next = self.grid[Ellipsis, time]
+                      
+        rho = self.grid[Ellipsis, time]
         
-            rho = self.grid[Ellipsis, time]
-            
-            Diff = CalcD(rho, self.l, self.c)
-            
-            
-            D, V = Diff.D, Diff.V
-            
-            
-            # changing indices
-            
-            D = np.einsum('Nxlu -> Nlxu', D)
-            
-            V = np.einsum('Nxl -> Nlx', V)
+        Diff = CalcD(rho, self.l, self.c)     
+        
+        D, V = Diff.D, Diff.V  # dimensions N, x, momenta
+        
+        for i in range(15):
             
             
-            first_der = np.einsum('Nlxu, Nlx -> Nlx', D, self.x_der(rho)) * self.int_l
+            rho_next = self.diff_fixed_point_func(rho, rho_next, D, V)
             
-            second_der = self.x_der(first_der)
-            
-            
-            rho_next = self.int_t * (0.5 * second_der - self.x_der(V*rho)) + rho
-            
-            return rho_next
      
+        return rho_next
      
     
     def solve_equation(self, path = None):
@@ -228,15 +243,12 @@ class Solver():
             with open(path, 'wb') as file:
                 pickle.dump(self.grid, file)
 
-
-
-
-
-
-
-
-
-
+        
+        def save_array(self, path):
+                   
+            with open(path, 'wb') as file:
+                       
+                pickle.dump(self.grid, file)
 
 
 
