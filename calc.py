@@ -105,13 +105,7 @@ class CalcD(CalcV):
                   
         
         T_dr = np.einsum('Nxlu, Nuo -> Nxlo', self.operator, self.T, optimize = True)
-        
-        
-        # Nxluo
-        
-        #T_dr = np.sum(self.operator[Ellipsis, np.newaxis] * self.T[:, np.newaxis, np.newaxis, Ellipsis], axis = -2)
-        
-        
+                
         # Now order of indices is N, x, l, u
         
         rho = self.rho[Ellipsis, np.newaxis]
@@ -130,8 +124,7 @@ class CalcD(CalcV):
         rho_factor = 1/(self.rho_tot[Ellipsis, np.newaxis] * self.rho_tot[Ellipsis, np.newaxis, :])   
         
         # dimensions N, x, l, u
-        D_ker = rho_factor * (delta * self.w[Ellipsis, np.newaxis]  - self.W * self.int_l)
-        
+        D_ker = rho_factor * (delta * self.w[Ellipsis, np.newaxis]  - self.W * self.int_l )
         
         return D_ker
     
