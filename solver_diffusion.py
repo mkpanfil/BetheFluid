@@ -183,11 +183,11 @@ class Solver():
         
         # D, V dimensions N, x, momenta
         
-        D_op = np.einsum('Nxos, Nox -> Nsx', D, self.x_der(rho_next), optimize = True)       
+        D_op = np.einsum('Nxos, Nsx -> Nox', D, self.x_der(rho_next), optimize = True)       
         
         V_rho = np.einsum('Nxl, Nlx -> Nlx', V, rho_next, optimize = True)
         
-        foo = rho + self.int_t/2 * (self.x_der(D_op) - self.x_der(V_rho))
+        foo = rho + self.int_t * (self.x_der(D_op)/2 - self.x_der(V_rho))
         
         diff = np.abs(diff - foo).mean()
         
@@ -253,7 +253,7 @@ class Solver():
         
         with open(path, 'wb') as file:
                        
-         dill.dump(self, file) 
+          dill.dump(self, file) 
     
     # loading arrays                   
     @staticmethod

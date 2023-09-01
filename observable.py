@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-#import pickle
 import dill
+import scipy as sci
 
 class Observable():
        
@@ -12,6 +12,7 @@ class Observable():
         self.T = self.get_T()
         self.rho_tot = self.get_rho_tot()
         self.rho_h = self.get_rho_h()
+        #self.n = self.get_n()
      
         
     def get_object(self, inp):
@@ -43,13 +44,13 @@ class Observable():
         T = np.stack(T_grid)
         
         return T
-       
+      
         
     def get_rho_tot(self):      
         
         # new indices are rho: N, x, l
         
-        rho_tot = 1/(2*np.pi) + np.einsum('Nlu, Nuxt -> Nxlt', self.T, self.object.grid, optimize = True)*self.object.int_l
+        rho_tot = 1/(2*np.pi) + np.einsum('Nlu, Nuxt -> Nlxt', self.T, self.object.grid, optimize = True)*self.object.int_l
         
         return rho_tot
     
@@ -59,7 +60,16 @@ class Observable():
         rho_h = self.rho_tot - self.object.grid
         
         return rho_h
-      
+    
+    
+    def x_der(self, arr):
+              
+        der = 1/(2*self.int_x) * (np.roll(arr, -1, axis = -1) - np.roll(arr, 1, axis = -1))
+        
+        #der = np.gradient(arr, self.int_x, axis = -1)
+        
+        return der
+    
     
     def energy_conservation(self, N = 0, path = None, *args, **kwargs):
         
@@ -123,17 +133,29 @@ class Observable():
     def enthropy(self, N = 0, path = None, *args, **kwargs):
         
         # Dimensions N, l, x, t
-        s = self.rho_tot * np.log(self.rho_tot) - self.object.grid * np.log(self.object.grid) - self.rho_h * np.log(self.rho_h)
-               
-        S = np.sum(s, axis = (1,2)) * self.object.int_x * self.object.int_l
         
-        plt.plot(self.object.t, S[N, :], *args, **kwargs)
-        plt.title('Enthropy of N-th particle')
-        plt.ylabel(r'$S$')
-        plt.xlabel('time')
+        rho = self.object.grid
+        
+        rho[rho < 0] = 0
+        
+        s = self.rho_tot * np.log(self.rho_tot) - sci.special.xlogy(rho, rho) - sci.special.xlogy(self.rho_h, self.rho_h)
+               
+        #S = np.sum(s, axis = (1,2)) * self.object.int_x * self.object.int_l
+        
+        
+        return s
+        
+        #plt.plot(self.object.t, S[N, :], *args, **kwargs)
+        #plt.plot(self.object.t, S[N, 40, :], label = r'$\lambda$ = 40', *args, **kwargs)
+        #plt.plot(self.object.t, S[N, 20, :], label  = r'$\lambda$ = 20', *args, **kwargs)
+        #plt.plot(self.object.t, S[N, 0, :], label  = r'$\lambda$ = 0', *args, **kwargs)
+        #plt.title('Enthropy of N-th particle')
+        #plt.ylabel(r'$S$')
+        #plt.xlabel('time')
+        #plt.legend()
         
         if path is not None:
             plt.savefig(path)
-        
-        
+    
+     
         

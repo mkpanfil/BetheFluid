@@ -23,7 +23,6 @@ class CalcV():
     
     def create_T(self):
         
-        # numba doesn't support meshgrid
         l, u = np.meshgrid(self.l,self.l, indexing = 'ij')
               
         T_grid = []
@@ -40,8 +39,7 @@ class CalcV():
         return T
 
     def get_n_rho_tot(self):
-        
-        
+                
         # new indices are rho: N, x, l
         
         rho_tot = 1/(2*np.pi) + np.einsum('Nlu, Nxu -> Nxl', self.T, self.rho)*self.int_l
@@ -97,6 +95,7 @@ class CalcD(CalcV):
         # dimensions N, x, l    
         self.W = self.get_W()
         self.w = np.sum(self.W, axis = -2) * self.int_l
+        #self.w = self.get_w()
         self.D_ker = self.get_D_ker()
         self.D = self.get_D()
         
@@ -112,23 +111,24 @@ class CalcD(CalcV):
         
         n =  self.n[Ellipsis, np.newaxis]
         
-        W = rho*(1 - n)*T_dr**2*np.abs(self.V[Ellipsis, np.newaxis] - self.V[Ellipsis, np.newaxis, :])
+        #rho_tot = self.rho_tot[Ellipsis, np.newaxis] 
+        
+        W = rho * (1 - n) * T_dr**2 * np.abs(self.V[Ellipsis, np.newaxis] - self.V[Ellipsis, np.newaxis, :])
     
         return W
-        
+    
     
     def get_D_ker(self):
         
         delta = np.identity(self.l.size)[np.newaxis, np.newaxis, Ellipsis]
-          
-        rho_factor = 1/(self.rho_tot[Ellipsis, np.newaxis] * self.rho_tot[Ellipsis, np.newaxis, :])   
+        
+        rho_tot = self.rho_tot[Ellipsis, np.newaxis]
         
         # dimensions N, x, l, u
-        D_ker = rho_factor * (delta * self.w[Ellipsis, np.newaxis]  - self.W * self.int_l )
+        D_ker = (delta * self.w[Ellipsis, np.newaxis]  - self.W * self.int_l)/rho_tot**2
         
         return D_ker
-    
-    
+      
     def get_D(self):
               
         
@@ -138,14 +138,17 @@ class CalcD(CalcV):
         
         op_ker = delta - Tn*self.int_l
         
+        rho_factor = self.rho_tot[Ellipsis, np.newaxis] / self.rho_tot[Ellipsis, np.newaxis, :]
         
-        D = np.einsum('Nxou, Nxul , Nxls -> Nxos', self.operator, self.D_ker, op_ker, optimize = True)
+        D_ker = self.D_ker * rho_factor
+        
+        D = np.einsum('Nxou, Nxul , Nxls -> Nxos', self.operator, D_ker, op_ker, optimize = True) 
         
              
         return D
     
 
-    
+# Changes:  rho_factor is in different place and D_ker is devided by rho_tot**2
     
       
     
