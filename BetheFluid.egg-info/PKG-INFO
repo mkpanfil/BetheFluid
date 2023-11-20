@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: BetheFluid
+Version: 0.2
+Summary: Python package for solving GHD equations
+Author: Antoni Lis

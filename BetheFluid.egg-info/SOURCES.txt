@@ -1,0 +1,12 @@
+setup.py
+BetheFluid/__init__.py
+BetheFluid/calc.py
+BetheFluid/observable.py
+BetheFluid/plotter.py
+BetheFluid/solver.py
+BetheFluid.egg-info/PKG-INFO
+BetheFluid.egg-info/SOURCES.txt
+BetheFluid.egg-info/dependency_links.txt
+BetheFluid.egg-info/not-zip-safe
+BetheFluid.egg-info/requires.txt
+BetheFluid.egg-info/top_level.txt
