@@ -1,5 +1,5 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import dill
 import scipy as sci
 
@@ -68,69 +68,50 @@ class Observable:
 
         return rho_h
 
-    def x_der(self, arr):
+    def energy(self, option='total'):
+        # Dimensions N, l, x, t
+        l = self.object.l[np.newaxis, :, np.newaxis, np.newaxis]
+        energy_grid = self.object.grid * l ** 2
 
-        der = 1 / (2 * self.int_x) * (np.roll(arr, -1, axis=-1) - np.roll(arr, 1, axis=-1))
+        option_mapping = {
+            'local': (np.sum(energy_grid, axis=1) * self.object.int_l),
+            'theta': (np.sum(energy_grid, axis=2) * self.object.int_x),
+            'total': (np.sum(energy_grid, axis=(1, 2)) * self.object.int_l * self.object.int_x)
+        }
 
-        # der = np.gradient(arr, self.int_x, axis = -1)
+        if option not in option_mapping:
+            raise ValueError('Incorrect argument, choose between: local, theta, total')
 
-        return der
+        energy = option_mapping[option]
 
-    def energy_conservation(self, N=0, path=None, *args, **kwargs):
+        if energy.shape[0] == 1:
+            energy = energy[0, Ellipsis]
 
+        return energy
+
+    # # here I can make it better if the index is negative
+    def n(self, option='total'):
         # Dimensions N, l, x, t
 
-        grid = np.sum(self.object.grid, axis=-2) * self.object.int_x
+        n_grid = self.object.grid / self.rho_tot
 
-        # Dimensions N, l, t
-        grid = grid * self.object.l[np.newaxis, :, np.newaxis] ** 2
+        option_mapping = {
+            'local': (np.sum(n_grid, axis=1) * self.object.int_l),
+            'theta': (np.sum(n_grid, axis=2) * self.object.int_x),
+            'total': (np.sum(n_grid, axis=(1, 2)) * self.object.int_l * self.object.int_x)
+        }
 
-        grid = np.sum(grid, axis=1) * self.object.int_l
+        if option not in option_mapping:
+            raise ValueError('Incorrect argument, choose between: local, theta, total')
 
-        plt.plot(self.object.t, grid[N, :], *args, **kwargs)
-        plt.title('Energy conservation of the N-th particle')
-        plt.ylabel('energy')
-        plt.xlabel('time')
+        n = option_mapping[option]
 
-        if path is not None:
-            plt.savefig(path)
+        if n.shape[0] == 1:
+            n = n[0, Ellipsis]
 
-    def density_conservation(self, N=0, path=None, *args, **kwargs):
+        return n
 
-        # Dimensions N, l, x, t
-
-        grid = np.sum(self.object.grid, axis=(1, 2)) * self.object.int_x * self.object.int_l
-
-        plt.plot(self.object.t, grid[N, :], *args, **kwargs)
-        plt.title('Density conservation of N-th particle')
-        plt.ylabel(r'$\rho$')
-        plt.xlabel('time')
-
-        if path is not None:
-            plt.savefig(path)
-
-    # here I can make it better if the index is negative
-    def n(self, N=0, frames=[0, -1], path=None, name='', style='-'):
-
-        grid = np.sum(self.object.grid, axis=1) * self.object.int_l
-
-        for item in frames:
-            plt.plot(self.object.x, grid[N, :, item], style,
-                     label='{} t = {}'.format(name, round(item * self.object.int_t, 3)))
-            plt.xlabel('x')
-            plt.ylabel(r'$\rho$')
-            plt.legend()
-
-    def n_lambda(self, N=0, t=-1, path=None, *args, **kwargs):
-
-        grid = np.sum(self.object.grid, axis=2) * self.object.int_x
-
-        plt.plot(self.object.l, grid[N, :, t])
-
-        if path is not None:
-            plt.savefig(path)
-
-    def enthropy(self, N=0, path=None, *args, **kwargs):
+    def entropy(self, option='total'):
 
         # Dimensions N, l, x, t
 
@@ -138,21 +119,79 @@ class Observable:
 
         rho[rho < 0] = 0
 
-        s = self.rho_tot * np.log(self.rho_tot) - sci.special.xlogy(rho, rho) - sci.special.xlogy(self.rho_h,
-                                                                                                  self.rho_h)
+        S_grid = self.rho_tot * np.log(self.rho_tot) - sci.special.xlogy(rho, rho) - sci.special.xlogy(self.rho_h,
+                                                                                                       self.rho_h)
+        option_mapping = {
+            'local': (np.sum(S_grid, axis=1) * self.object.int_l),
+            'theta': (np.sum(S_grid, axis=2) * self.object.int_x),
+            'total': (np.sum(S_grid, axis=(1, 2)) * self.object.int_l * self.object.int_x)
+        }
 
-        # S = np.sum(s, axis = (1,2)) * self.object.int_x * self.object.int_l
+        if option not in option_mapping:
+            raise ValueError('Incorrect argument, choose between: local, theta, total')
 
-        return s
+        entropy = option_mapping[option]
 
-        # plt.plot(self.object.t, S[N, :], *args, **kwargs)
-        # plt.plot(self.object.t, S[N, 40, :], label = r'$\lambda$ = 40', *args, **kwargs)
-        # plt.plot(self.object.t, S[N, 20, :], label  = r'$\lambda$ = 20', *args, **kwargs)
-        # plt.plot(self.object.t, S[N, 0, :], label  = r'$\lambda$ = 0', *args, **kwargs)
-        # plt.title('Enthropy of N-th particle')
-        # plt.ylabel(r'$S$')
-        # plt.xlabel('time')
-        # plt.legend()
+        if entropy.shape[0] == 1:
+            entropy = entropy[0, Ellipsis]
+
+        return entropy
+
+    def plot_template(self, observable, option='local', frames=(0, -1), N=0, path=None, name='', style='-'):
+
+        main_options_dictionairy = {
+            'n': {
+                'local': {'x_axis': self.object.x, 'y_axis': self.n('local'), 'x_label': 'x', 'y_label': 'n'},
+                'theta': {'x_axis': self.object.l, 'y_axis': self.n('theta'), 'x_label': 'theta', 'y_label': 'n'},
+                'total': {'x_axis': self.object.t, 'y_axis': self.n('total'), 'x_label': 'time', 'y_label': 'n'}},
+
+            'energy': {
+                'local': {'x_axis': self.object.x, 'y_axis': self.energy('local'), 'x_label': 'x', 'y_label': 'energy'},
+                'theta': {'x_axis': self.object.l, 'y_axis': self.energy('theta'), 'x_label': 'theta',
+                          'y_label': 'energy'},
+                'total': {'x_axis': self.object.t, 'y_axis': self.energy('total'), 'x_label': 'time',
+                          'y_label': 'energy'}},
+
+            'entropy': {
+                'local': {'x_axis': self.object.x, 'y_axis': self.entropy('local'), 'x_label': 'x', 'y_label': 'entropy'},
+                'theta': {'x_axis': self.object.l, 'y_axis': self.entropy('theta'), 'x_label': 'theta',
+                          'y_label': 'entropy'},
+                'total': {'x_axis': self.object.t, 'y_axis': self.entropy('total'), 'x_label': 'time',
+                          'y_label': 'entropy'}}
+        }
+
+        option_mapping = main_options_dictionairy[observable]
+
+        if option not in option_mapping:
+            raise ValueError('Incorrect argument, choose between: local, theta, total')
+
+        if option == 'total':
+            plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, :], style,
+                     )
+            plt.xlabel('time')
+            plt.ylabel(option_mapping[option]['y_label'])
+            plt.show()
+
+        else:
+            for item in frames:
+                plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, item], style,
+                         label='{} t = {}'.format(name, round(item * self.object.int_t, 3)))
+            plt.xlabel(option_mapping[option]['x_label'])
+            plt.ylabel(option_mapping[option]['y_label'])
+            plt.legend()
+            plt.show()
 
         if path is not None:
             plt.savefig(path)
+
+    def plot_n(self, option='local', frames=(0, -1), N=0, path=None, name='', style='-'):
+
+        self.plot_template(observable='n', option=option, frames=frames, N=N, path=path, name=name, style=style)
+
+    def plot_energy(self, option='total', frames=(0, -1), N=0, path=None, name='', style='-'):
+
+        self.plot_template(observable='energy', option=option, frames=frames, N=N, path=path, name=name, style=style)
+
+    def plot_entropy(self, option='total', frames=(0, -1), N=0, path=None, name='', style='-'):
+
+        self.plot_template(observable='entropy', option=option, frames=frames, N=N, path=path, name=name, style=style)

@@ -5,9 +5,9 @@ with open('requirements.txt') as f:
 
 setup(
     name="BetheFluid",
-    version="0.2",
+    version="0.3",
     description='Python package for solving GHD equations',
-    author='Antoni Lis',
+    author='Antoni Lis, Milosz Panfil',
     packages=['BetheFluid'],
     install_requires=requirements,
     zip_safe=False

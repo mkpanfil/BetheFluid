@@ -2,7 +2,6 @@ setup.py
 BetheFluid/__init__.py
 BetheFluid/calc.py
 BetheFluid/observable.py
-BetheFluid/plotter.py
 BetheFluid/solver.py
 BetheFluid.egg-info/PKG-INFO
 BetheFluid.egg-info/SOURCES.txt
