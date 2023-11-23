@@ -153,7 +153,8 @@ class Observable:
                           'y_label': 'energy'}},
 
             'entropy': {
-                'local': {'x_axis': self.object.x, 'y_axis': self.entropy('local'), 'x_label': 'x', 'y_label': 'entropy'},
+                'local': {'x_axis': self.object.x, 'y_axis': self.entropy('local'), 'x_label': 'x',
+                          'y_label': 'entropy'},
                 'theta': {'x_axis': self.object.l, 'y_axis': self.entropy('theta'), 'x_label': 'theta',
                           'y_label': 'entropy'},
                 'total': {'x_axis': self.object.t, 'y_axis': self.entropy('total'), 'x_label': 'time',
@@ -163,10 +164,17 @@ class Observable:
         option_mapping = main_options_dictionairy[observable]
 
         if option not in option_mapping:
-            raise ValueError('Incorrect argument, choose between: local, theta, total')
+            raise ValueError('Incorrect argument, choose between: local, theta or total')
+
+        if self.object.grid.shape[0] == 1:
+            y_axis = option_mapping[option]['y_axis']
+
+        else:
+
+            y_axis = option_mapping[option]['y_axis'][N, Ellipsis]
 
         if option == 'total':
-            plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, :], style,
+            plt.plot(option_mapping[option]['x_axis'], y_axis, style,
                      )
             plt.xlabel('time')
             plt.ylabel(option_mapping[option]['y_label'])
@@ -174,7 +182,7 @@ class Observable:
 
         else:
             for item in frames:
-                plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, item], style,
+                plt.plot(option_mapping[option]['x_axis'], y_axis[:, item], style,
                          label='{} t = {}'.format(name, round(item * self.object.int_t, 3)))
             plt.xlabel(option_mapping[option]['x_label'])
             plt.ylabel(option_mapping[option]['y_label'])
