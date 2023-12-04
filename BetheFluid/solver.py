@@ -14,13 +14,14 @@ class Solver:
         l : list or numpy array
         x : list or numpy array
         t : list or numpy array
-        rho0 : function or tuple of functions
-        c : float or tuple of floats
+        rho0 : function
+        c : float
         boundary : None or tuple
         diff : bool
         '''
         self.l, self.x, self.t = self.correct_l_x_t(l, x, t)
-        self.c, self.rho0 = self.to_tuple(c, rho0)
+        self.c = c
+        self.rho0 = rho0
         self.boundary = self.correct_boundary(boundary)
         self.potential = self.get_potential(potential)
         self.int_x, self.int_t, self.int_l, self.steps_number = self.get_ints()
@@ -80,32 +81,10 @@ class Solver:
     def get_potential(self, potential):
 
         if potential is not None:
-            potential = potential(self.x)[np.newaxis, np.newaxis, :]
+            potential = potential(self.x)[np.newaxis, :]
 
         return potential
 
-    def to_tuple(self, c, rho0):
-        '''
-        ensures that c and rho0 are tuple and have this same size
-        Parameters
-        ----------
-        c
-        rho0
-
-        Returns
-        -------
-        c and rho0 as tuple
-        '''
-        if isinstance(c, tuple) == False:
-            c = (c,)
-
-        if isinstance(rho0, tuple) == False:
-            rho0 = (rho0,)
-
-        if len(c) != len(rho0):
-            raise TypeError('c and rho0 have to have this same size')
-
-        return c, rho0
 
     def get_ints(self):
         '''
@@ -134,16 +113,9 @@ class Solver:
         '''
         # dimensions: N, l, x, t
 
-        grid = np.zeros((len(self.c), self.l.size, self.x.size, self.t.size))
+        grid = np.zeros((self.l.size, self.x.size, self.t.size))
 
-        N_dim = []
-
-        for item in self.rho0:
-            N = item(self.l[:, np.newaxis], self.x[np.newaxis, :])
-
-            N_dim.append(N)
-
-        initial_state = np.stack(N_dim)
+        initial_state = self.rho0(self.l[:, np.newaxis], self.x[np.newaxis, :])
 
         grid[Ellipsis, 0] = initial_state
 
@@ -160,7 +132,7 @@ class Solver:
         -------
         numpy array which is a matrix required for implicit solving of GHD
         '''
-        # dimensions N, l, x for rho and V
+        # dimensions l, x for rho and V
 
         rho = self.grid[Ellipsis, time]
 
@@ -170,7 +142,7 @@ class Solver:
 
         # changing indices back to proper order
 
-        V = np.einsum('Nxl -> Nlx', V)
+        V = np.einsum('xl -> lx', V)
 
         h = self.int_t / (2 * self.int_x)
 
@@ -181,13 +153,13 @@ class Solver:
         np.fill_diagonal(off_diagonal[:, 1:], 1)
         np.fill_diagonal(off_diagonal[1:, 0:], -1)
 
-        off_diagonal = V_V_h * off_diagonal[np.newaxis, np.newaxis, Ellipsis]
+        off_diagonal = V_V_h * off_diagonal[np.newaxis, Ellipsis]
 
         diagonal = np.zeros((V_V_h.shape[-1], V_V_h.shape[-1]))
 
         np.fill_diagonal(diagonal, 1)
 
-        diagonal = np.ones_like(V_V_h) * diagonal[np.newaxis, np.newaxis, Ellipsis]
+        diagonal = np.ones_like(V_V_h) * diagonal[np.newaxis, Ellipsis]
 
         matrix = diagonal + off_diagonal
 
@@ -220,8 +192,6 @@ class Solver:
         numpy array which is a derivative in x dimension of inputted arr
         '''
         der = 1 / (2 * self.int_x) * (np.roll(arr, -1, axis=-1) - np.roll(arr, 1, axis=-1))
-
-        # der = np.gradient(arr, self.int_x, axis = -1)
 
         return der
 
@@ -256,11 +226,11 @@ class Solver:
         '''
         diff = rho_next
 
-        # D, V dimensions N, x, momenta
+        # D, V dimensions x, momenta
 
-        D_op = np.einsum('Nxos, Nsx -> Nox', D, self.x_der(rho_next), optimize=True)
+        D_op = np.einsum('xos, sx -> ox', D, self.x_der(rho_next), optimize=True)
 
-        V_rho = np.einsum('Nxl, Nlx -> Nlx', V, rho_next, optimize=True)
+        V_rho = np.einsum('xl, lx -> lx', V, rho_next, optimize=True)
 
         if self.potential is None:
 

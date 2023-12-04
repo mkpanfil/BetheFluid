@@ -15,7 +15,7 @@ class CalcV:
         l : numpy array, momenta
         c : tuple of floats, coupling constants
         '''
-        # dimensions of rho N, x, l
+        # dimensions of rho x, l
         self.rho = self.get_rho(rho)
         self.l = l
         self.c = c
@@ -34,10 +34,10 @@ class CalcV:
 
         Returns
         -------
-        numpy array, rho with dimensions: N, x, l
+        numpy array, rho with dimensions: x, l
 
         '''
-        rho = np.einsum('Nlx -> Nxl', rho)
+        rho = np.einsum('lx -> xl', rho)
 
         return rho
 
@@ -49,15 +49,7 @@ class CalcV:
         '''
         l, u = np.meshgrid(self.l, self.l, indexing='ij')
 
-        T_grid = []
-
-        for value in self.c:
-            T = value / np.pi * 1 / ((l - u) ** 2 + value ** 2)
-
-            T_grid.append(T)
-
-        # dimensions N, l, u   
-        T = np.stack(T_grid)
+        T = self.c / np.pi * 1 / ((l - u) ** 2 + self.c ** 2)
 
         return T
 
@@ -71,7 +63,7 @@ class CalcV:
         '''
         # new indices are rho: N, x, l
 
-        rho_tot = 1 / (2 * np.pi) + np.einsum('Nlu, Nxu -> Nxl', self.T, self.rho) * self.int_l
+        rho_tot = 1 / (2 * np.pi) + np.einsum('lu, xu -> xl', self.T, self.rho, optimize=True) * self.int_l
 
         n = self.rho / rho_tot
 
@@ -85,17 +77,17 @@ class CalcV:
         operator : numpy array
         '''
 
-        # dimensions : T(N,l,u) , n(N, x, u)
-        Tn = self.T[:, np.newaxis, :, :] * self.n[:, :, np.newaxis, :]
+        # dimensions : T(l,u) , n(x, u)
+        Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
 
-        # create delta l,u for each N and x
-        # dimensions N, x, l, u
+        # create delta l,u for each x
+        # dimensions x, l, u
 
-        delta = np.identity(self.l.size)[np.newaxis, np.newaxis, :, :]
+        delta = np.identity(self.l.size)[np.newaxis, Ellipsis]
 
         operator = delta - Tn * self.int_l
 
-        # dimensions N,x, l, u
+        # dimensions x, l, u
         operator = np.linalg.inv(operator)
 
         return operator
@@ -107,13 +99,13 @@ class CalcV:
         -------
         V : numpy array
         '''
-        # dimensions N, x, l
+        # dimensions x, l
 
         u = 2 * self.l
 
         k_dr = np.sum(self.operator, axis=-1)
 
-        omega_dr = np.einsum('Nxlu, u -> Nxl', self.operator, u)
+        omega_dr = np.einsum('xlu, u -> xl', self.operator, u)
 
         V = omega_dr / k_dr
 
@@ -139,7 +131,6 @@ class CalcD(CalcV):
         # dimensions N, x, l    
         self.W = self.get_W()
         self.w = np.sum(self.W, axis=-2) * self.int_l
-        # self.w = self.get_w()
         self.D_ker = self.get_D_ker()
         self.D = self.get_D()
 
@@ -150,15 +141,13 @@ class CalcD(CalcV):
         -------
         W : numpy array
         '''
-        T_dr = np.einsum('Nxlu, Nuo -> Nxlo', self.operator, self.T, optimize=True)
+        T_dr = np.einsum('xlu, uo -> xlo', self.operator, self.T, optimize=True)
 
-        # Now order of indices is N, x, l, u
+        # Now order of indices is x, l, u
 
         rho = self.rho[Ellipsis, np.newaxis]
 
         n = self.n[Ellipsis, np.newaxis]
-
-        # rho_tot = self.rho_tot[Ellipsis, np.newaxis]
 
         W = rho * (1 - n) * T_dr ** 2 * np.abs(self.V[Ellipsis, np.newaxis] - self.V[Ellipsis, np.newaxis, :])
 
@@ -171,11 +160,11 @@ class CalcD(CalcV):
         -------
         D_ker : numpy array
         '''
-        delta = np.identity(self.l.size)[np.newaxis, np.newaxis, Ellipsis]
+        delta = np.identity(self.l.size)[np.newaxis, Ellipsis]
 
         rho_tot = self.rho_tot[Ellipsis, np.newaxis]
 
-        # dimensions N, x, l, u
+        # dimensions x, l, u
         D_ker = (delta * self.w[Ellipsis, np.newaxis] - self.W * self.int_l) / rho_tot ** 2
 
         return D_ker
@@ -187,9 +176,9 @@ class CalcD(CalcV):
         -------
         D : numpy array
         '''
-        Tn = self.T[:, np.newaxis, :, :] * self.n[:, :, np.newaxis, :]
+        Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
 
-        delta = np.identity(self.l.size)[np.newaxis, np.newaxis, Ellipsis]
+        delta = np.identity(self.l.size)[np.newaxis, Ellipsis]
 
         op_ker = delta - Tn * self.int_l
 
@@ -197,7 +186,7 @@ class CalcD(CalcV):
 
         D_ker = self.D_ker * rho_factor
 
-        D = np.einsum('Nxou, Nxul , Nxls -> Nxos', self.operator, D_ker, op_ker, optimize=True)
+        D = np.einsum('xou, xul , xls -> xos', self.operator, D_ker, op_ker, optimize=True)
 
         return D
 
