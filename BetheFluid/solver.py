@@ -274,7 +274,7 @@ class Solver:
 
         return rho_next, diff
 
-    def solve_equation(self, path=None):
+    def solve_equation(self, path=None, starting_point=0):
         '''
         Function solving GHD or GHD with diffusion using previous methods
         Parameters
@@ -287,25 +287,42 @@ class Solver:
         -------
 
         '''
+
         if self.diff is False:
 
-            for time in tqdm(range(self.t.size - 1)):
-                matrix = self.create_matrix(time)
+            for time_step in tqdm(range(starting_point, self.grid.shape[-1] - 1)):
+                matrix = self.create_matrix(time_step)
 
-                self.grid[Ellipsis, time + 1] = np.linalg.solve(matrix, self.grid[Ellipsis, time])
+                self.grid[Ellipsis, time_step + 1] = np.linalg.solve(matrix, self.grid[Ellipsis, time_step])
 
         else:
 
-            for time in tqdm(range(self.t.size - 1)):
-                rho_next, diff = self.diff_equ(time)
+            for time_step in tqdm(range(starting_point, self.grid.shape[-1] - 1)):
+                rho_next, diff = self.diff_equ(time_step)
 
-                self.grid[Ellipsis, time + 1] = rho_next
+                self.grid[Ellipsis, time_step + 1] = rho_next
 
                 self.convergence.append(diff)
 
         if path is not None:
             with open(path, 'wb') as file:
                 dill.dump(self, file)
+
+
+    def continue_calculations(self, elongation_factor, path=None):
+
+        new_t = np.arange(self.t[-1] + self.int_t, self.t[-1] * (1 + elongation_factor), self.int_t)
+
+        new_grid = np.zeros((self.l.size, self.x.size, new_t.size))
+
+        self.grid = np.concatenate((self.grid, new_grid), axis=-1)
+
+        starting_point = self.t.size - 1
+
+        self.solve_equation(path=path, starting_point=starting_point)
+
+        self.t = np.hstack((self.t, new_t))
+
 
     def save_array(self, path):
         '''
