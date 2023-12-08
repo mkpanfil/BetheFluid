@@ -161,8 +161,8 @@ class Observable:
 
         else:
             for item in frames:
-                plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'], style,
-                         label='{} t = {}'.format(name, round(item * self.object.int_t, 3)))
+                plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, item], style,
+                         label='{} t = {}'.format(name, round(self.object.t[item], 3)))
             plt.xlabel(option_mapping[option]['x_label'])
             plt.ylabel(option_mapping[option]['y_label'])
             plt.legend()
@@ -179,6 +179,6 @@ class Observable:
 
         self.plot_template(observable='energy', option=option, frames=frames, path=path, name=name, style=style)
 
-    def plot_entropy(self, option='total', frames=(0, -1), N=0, path=None, name='', style='-'):
+    def plot_entropy(self, option='total', frames=(0, -1), path=None, name='', style='-'):
 
         self.plot_template(observable='entropy', option=option, frames=frames, path=path, name=name, style=style)
