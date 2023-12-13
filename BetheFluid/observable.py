@@ -46,40 +46,31 @@ class Observable:
 
         return rho_h
 
+    def __calc_template(self, observable, option):
+
+        option_mapping = {
+            'local': (np.sum(observable, axis=0) * self.solver_object.int_l),
+            'theta': (np.sum(observable, axis=1) * self.solver_object.int_x),
+            'total': (np.sum(observable, axis=(0, 1)) * self.solver_object.int_l * self.solver_object.int_x)
+        }
+
+        if option not in option_mapping:
+            raise ValueError('Incorrect argument, choose between: local, theta, total')
+
+        result = option_mapping[option]
+
+        return result
+
     def calc_energy(self, option='total'):
         # Dimensions l, x, t
         l = self.solver_object.l[:, np.newaxis, np.newaxis]
         energy_grid = self.solver_object.grid * l ** 2
 
-        option_mapping = {
-            'local': (np.sum(energy_grid, axis=0) * self.solver_object.int_l),
-            'theta': (np.sum(energy_grid, axis=1) * self.solver_object.int_x),
-            'total': (np.sum(energy_grid, axis=(0, 1)) * self.solver_object.int_l * self.solver_object.int_x)
-        }
-
-        if option not in option_mapping:
-            raise ValueError('Incorrect argument, choose between: local, theta, total')
-
-        energy = option_mapping[option]
-
-        return energy
+        return self.__calc_template(energy_grid, option)
 
     # # here I can make it better if the index is negative
     def calc_n(self, option='total'):
-        # Dimensions l, x, t
-
-        option_mapping = {
-            'local': (np.sum(self.n, axis=0) * self.solver_object.int_l),
-            'theta': (np.sum(self.n, axis=1) * self.solver_object.int_x),
-            'total': (np.sum(self.n, axis=(0, 1)) * self.solver_object.int_l * self.solver_object.int_x)
-        }
-
-        if option not in option_mapping:
-            raise ValueError('Incorrect argument, choose between: local, theta, total')
-
-        n = option_mapping[option]
-
-        return n
+        return self.__calc_template(self.n, option)
 
     def calc_entropy(self, option='total'):
 
@@ -91,29 +82,22 @@ class Observable:
 
         S_grid = self.rho_tot * np.log(self.rho_tot) - sci.special.xlogy(rho, rho) - sci.special.xlogy(self.rho_h,
                                                                                                        self.rho_h)
-        option_mapping = {
-            'local': (np.sum(S_grid, axis=0) * self.solver_object.int_l),
-            'theta': (np.sum(S_grid, axis=1) * self.solver_object.int_x),
-            'total': (np.sum(S_grid, axis=(0, 1)) * self.solver_object.int_l * self.solver_object.int_x)
-        }
+        return self.__calc_template(S_grid, option)
 
-        if option not in option_mapping:
-            raise ValueError('Incorrect argument, choose between: local, theta, total')
-
-        entropy = option_mapping[option]
-
-        return entropy
-
-    def plot_template(self, observable, option='local', frames=(0, -1), path=None, name='', style='-'):
+    def __plot_template(self, observable, option='local', frames=(0, -1), path=None, name='', style='-'):
 
         main_options_dictionairy = {
             'n': {
-                'local': {'x_axis': self.solver_object.x, 'y_axis': self.calc_n('local'), 'x_label': 'x', 'y_label': 'n'},
-                'theta': {'x_axis': self.solver_object.l, 'y_axis': self.calc_n('theta'), 'x_label': 'theta', 'y_label': 'n'},
-                'total': {'x_axis': self.solver_object.t, 'y_axis': self.calc_n('total'), 'x_label': 'time', 'y_label': 'n'}},
+                'local': {'x_axis': self.solver_object.x, 'y_axis': self.calc_n('local'), 'x_label': 'x',
+                          'y_label': 'n'},
+                'theta': {'x_axis': self.solver_object.l, 'y_axis': self.calc_n('theta'), 'x_label': 'theta',
+                          'y_label': 'n'},
+                'total': {'x_axis': self.solver_object.t, 'y_axis': self.calc_n('total'), 'x_label': 'time',
+                          'y_label': 'n'}},
 
             'energy': {
-                'local': {'x_axis': self.solver_object.x, 'y_axis': self.calc_energy('local'), 'x_label': 'x', 'y_label': 'energy'},
+                'local': {'x_axis': self.solver_object.x, 'y_axis': self.calc_energy('local'), 'x_label': 'x',
+                          'y_label': 'energy'},
                 'theta': {'x_axis': self.solver_object.l, 'y_axis': self.calc_energy('theta'), 'x_label': 'theta',
                           'y_label': 'energy'},
                 'total': {'x_axis': self.solver_object.t, 'y_axis': self.calc_energy('total'), 'x_label': 'time',
@@ -154,12 +138,12 @@ class Observable:
 
     def plot_n(self, option='local', frames=(0, -1), path=None, name='', style='-'):
 
-        self.plot_template(observable='n', option=option, frames=frames,  path=path, name=name, style=style)
+        self.__plot_template(observable='n', option=option, frames=frames, path=path, name=name, style=style)
 
     def plot_energy(self, option='total', frames=(0, -1), path=None, name='', style='-'):
 
-        self.plot_template(observable='energy', option=option, frames=frames, path=path, name=name, style=style)
+        self.__plot_template(observable='energy', option=option, frames=frames, path=path, name=name, style=style)
 
     def plot_entropy(self, option='total', frames=(0, -1), path=None, name='', style='-'):
 
-        self.plot_template(observable='entropy', option=option, frames=frames, path=path, name=name, style=style)
+        self.__plot_template(observable='entropy', option=option, frames=frames, path=path, name=name, style=style)
