@@ -37,7 +37,7 @@ class CalcV:
         numpy array, rho with dimensions: x, l
 
         '''
-        rho = np.einsum('lx -> xl', rho)
+        rho = np.einsum('lx... -> xl...', rho)
 
         return rho
 
@@ -63,7 +63,7 @@ class CalcV:
         '''
         # new indices are rho: N, x, l
 
-        rho_tot = 1 / (2 * np.pi) + np.einsum('lu, xu -> xl', self.T, self.rho, optimize=True) * self.int_l
+        rho_tot = 1 / (2 * np.pi) + np.einsum('lu..., xu... -> xl...', self.T, self.rho, optimize=True) * self.int_l
 
         n = self.rho / rho_tot
 
@@ -77,17 +77,26 @@ class CalcV:
         operator : numpy array
         '''
 
-        # dimensions : T(l,u) , n(x, u)
-        Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
+        # dimensions : T(l,u) , n(x, u) -> Tn (x,l,u)
+        #Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
+
+        Tn = np.einsum('lu, xu... -> xlu...', self.T, self.n, optimize=True)
 
         # create delta l,u for each x
         # dimensions x, l, u
 
-        delta = np.identity(self.l.size)[np.newaxis, Ellipsis]
+        delta = np.identity(self.l.size)
+
+        ones = np.ones_like(Tn)
+
+        delta = np.einsum('xlu..., lu -> xlu...', ones, delta)
 
         operator = delta - Tn * self.int_l
 
         # dimensions x, l, u
+
+        operator = np.einsum('xlu... -> ...xlu', operator)
+
         operator = np.linalg.inv(operator)
 
         return operator
@@ -105,7 +114,7 @@ class CalcV:
 
         k_dr = np.sum(self.operator, axis=-1)
 
-        omega_dr = np.einsum('xlu, u -> xl', self.operator, u)
+        omega_dr = np.einsum('...xlu, u -> ...xl', self.operator, u)
 
         V = omega_dr / k_dr
 
