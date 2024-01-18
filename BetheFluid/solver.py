@@ -85,7 +85,6 @@ class Solver:
 
         return potential
 
-
     def get_ints(self):
         '''
         extracts required data from x,t grids
@@ -96,7 +95,7 @@ class Solver:
         '''
         int_x = np.diff(self.x).mean()
 
-        int_t = np.diff(self.t).mean()
+        int_t = np.diff(self.t)
 
         int_l = np.diff(self.l).mean()
 
@@ -144,7 +143,7 @@ class Solver:
 
         V = np.einsum('xl -> lx', V)
 
-        h = self.int_t / (2 * self.int_x)
+        h = self.int_t[time] / (2 * self.int_x)
 
         V_V_h = h * V[Ellipsis, np.newaxis, :] * np.ones_like(V)[Ellipsis, np.newaxis]
 
@@ -210,7 +209,7 @@ class Solver:
 
         return der
 
-    def diff_fixed_point_func(self, rho, rho_next, D, V):
+    def diff_fixed_point_func(self, rho, rho_next, D, V, time):
         '''
         functions utilizing fixed point iteration method for solving GHD with diffusion
         Parameters
@@ -234,11 +233,11 @@ class Solver:
 
         if self.potential is None:
 
-            foo = rho + self.int_t * (self.x_der(D_op) / 2 - self.x_der(V_rho))
+            foo = rho + self.int_t[time] * (self.x_der(D_op) / 2 - self.x_der(V_rho))
 
         else:
 
-            foo = rho + self.int_t * (
+            foo = rho + self.int_t[time] * (
                     self.x_der(D_op) / 2 - self.x_der(V_rho) + self.x_der(self.potential) * self.lambda_der(rho))
 
         diff = np.abs(diff - foo).mean()
@@ -268,7 +267,7 @@ class Solver:
         diff = []
 
         for i in range(15):
-            rho_next, difference = self.diff_fixed_point_func(rho, rho_next, D, V)
+            rho_next, difference = self.diff_fixed_point_func(rho, rho_next, D, V, time)
 
             diff.append(difference)
 
@@ -308,10 +307,15 @@ class Solver:
             with open(path, 'wb') as file:
                 dill.dump(self, file)
 
+    def continue_calculations(self, elongation_factor, time_array=None, path=None):
 
-    def continue_calculations(self, elongation_factor, path=None):
+        if time_array is None:
 
-        new_t = np.arange(self.t[-1] + self.int_t, self.t[-1] * (1 + elongation_factor), self.int_t)
+            new_t = np.arange(self.t[-1] + np.mean(self.int_t), self.t[-1] * (1 + elongation_factor),
+                              np.mean(self.int_t))
+
+        else:
+            new_t = time_array
 
         new_grid = np.zeros((self.l.size, self.x.size, new_t.size))
 
@@ -319,9 +323,12 @@ class Solver:
 
         starting_point = self.t.size - 1
 
+        self.t = np.hstack((self.t, new_t))
+
+        self.int_t = np.diff(self.t)
+
         self.solve_equation(path=path, starting_point=starting_point)
 
-        self.t = np.hstack((self.t, new_t))
 
 
     def save_array(self, path):
