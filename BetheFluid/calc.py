@@ -71,33 +71,24 @@ class CalcV:
 
     def get_operator(self):
         '''
-        Creates 1 -Tn operator required for velocity calculations
+        Creates (1 - Tn)^-1 operator required for velocity calculations
         Returns
         -------
         operator : numpy array
         '''
 
-        # dimensions : T(l,u) , n(x, u) -> Tn (x,l,u)
-        #Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
+        # input dimensions might be xlu or xlut for Observable object
 
-        Tn = np.einsum('lu, xu... -> xlu...', self.T, self.n, optimize=True)
+        # performing Tn multiplication
+        operator = np.einsum('lu, xu... -> xlu...', self.T, self.n, optimize=True)
 
-        # create delta l,u for each x
-        # dimensions x, l, u
+        # changing order of dimensions -> to let t be the first argument
+        np.einsum('xlu... -> ...xlu', operator, out=operator)
 
-        delta = np.identity(self.l.size)
+        # getting 1 - Tn
+        np.subtract(np.identity(self.l.size), operator * self.int_l, out=operator)
 
-        ones = np.ones_like(Tn)
-
-        delta = np.einsum('xlu..., lu -> xlu...', ones, delta)
-
-        operator = delta - Tn * self.int_l
-
-        # dimensions x, l, u
-
-        operator = np.einsum('xlu... -> ...xlu', operator)
-
-        operator = np.linalg.inv(operator)
+        np.linalg.inv(operator, out=operator)
 
         return operator
 
@@ -137,7 +128,7 @@ class CalcD(CalcV):
         '''
         super().__init__(rho, l, c)
 
-        # dimensions N, x, l    
+        # dimensions N, x, l
         self.W = self.get_W()
         self.w = np.sum(self.W, axis=-2) * self.int_l
         self.D_ker = self.get_D_ker()

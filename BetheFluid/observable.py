@@ -68,7 +68,6 @@ class Observable:
 
         return self.__calc_template(energy_grid, option)
 
-    # # here I can make it better if the index is negative
     def calc_n(self, option='total'):
         return self.__calc_template(self.n, option)
 
