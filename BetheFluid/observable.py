@@ -63,8 +63,11 @@ class Observable:
 
     def calc_energy(self, option='total'):
         # Dimensions l, x, t
+
         l = self.solver_object.l[:, np.newaxis, np.newaxis]
         energy_grid = self.solver_object.grid * l ** 2
+        if self.solver_object.potential is not None:
+            energy_grid += self.solver_object.grid * self.solver_object.potential[Ellipsis, np.newaxis]
 
         return self.__calc_template(energy_grid, option)
 
