@@ -80,17 +80,12 @@ class CalcV:
         # input dimensions might be xlu or xlut for Observable object
 
         # performing Tn multiplication
-        operator = np.einsum('lu, xu... -> xlu...', self.T, self.n, optimize=True)
-
-        # changing order of dimensions -> to let t be the first argument
-        np.einsum('xlu... -> ...xlu', operator, out=operator)
+        operator = np.einsum('lu, xu... -> ...xlu', self.T, self.n, optimize=True)
 
         # getting 1 - Tn
         np.subtract(np.identity(self.l.size), operator * self.int_l, out=operator)
 
-        np.linalg.inv(operator, out=operator)
-
-        return operator
+        return np.linalg.inv(operator)
 
     def get_V(self):
         '''
