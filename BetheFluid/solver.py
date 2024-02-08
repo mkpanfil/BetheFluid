@@ -29,6 +29,34 @@ class Solver:
         self.convergence = []
         self.grid = self.create_initial_grid()
 
+    def __str__(self):
+
+        informations = {'Coupling constant': self.c,
+                        'Time grid': 'Lenght: {}, average interval {}, final step {}'.format(self.t.size,
+                                                                                             np.mean(self.int_t),
+                                                                                             self.t[-1])}
+
+        return 'Solver object: \n{}'.format(informations)
+
+    def __add__(self, other):
+
+        first_is_bigger = np.all(self.t > other.t)
+
+        second_is_bigger = np.all(self.t < other.t)
+
+        if first_is_bigger or second_is_bigger:
+
+            self.t = np.append(self.t, other.t)
+
+            return self
+
+        else:
+
+            raise ValueError('Wrong time grids, cannot add those Solver objects')
+
+
+
+
     def correct_l_x_t(self, l, x, t):
         '''
         checking correctnes of the input and changes list into the numpy arrays
@@ -328,8 +356,6 @@ class Solver:
         self.int_t = np.diff(self.t)
 
         self.solve_equation(path=path, starting_point=starting_point)
-
-
 
     def save_array(self, path):
         '''
