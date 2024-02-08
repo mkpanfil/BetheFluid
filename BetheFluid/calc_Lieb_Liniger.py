@@ -1,14 +1,9 @@
 import numpy as np
+from BetheFluid.calc import TBA, CalcV, CalcD
 
 
-from BetheFluid.calc import CalcV, CalcD
 
-
-class VelocityLiebLiniger(CalcV):
-    '''
-    Class calculating effective velocity of given state rho
-    '''
-
+class TBA_LiebLiniger(TBA):
     def create_T(self):
         '''
         Returns
@@ -20,6 +15,79 @@ class VelocityLiebLiniger(CalcV):
         T = self.c / np.pi * 1 / ((l - u) ** 2 + self.c ** 2)
 
         return T
+
+    def get_n_rho_tot(self):
+        '''
+        Calculates n and rho total
+        Returns
+        -------
+        n : numpy array
+        rho_tot : numpy array
+        '''
+        # new indices are rho: N, x, l
+
+        rho_tot = 1 / (2 * np.pi) + np.einsum('lu..., xu... -> xl...', self.T, self.rho, optimize=True) * self.int_l
+
+        n = self.rho / rho_tot
+
+        return n, rho_tot
+
+class VelocityLiebLiniger(CalcV, TBA_LiebLiniger):
+    '''
+    Class calculating effective velocity of given state rho
+    '''
+
+    def get_operator(self):
+        '''
+        Creates 1 -Tn operator required for velocity calculations
+        Returns
+        -------
+        operator : numpy array
+        '''
+
+        # dimensions : T(l,u) , n(x, u) -> Tn (x,l,u)
+        # Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
+
+        Tn = np.einsum('lu, xu... -> xlu...', self.T, self.n, optimize=True)
+
+        # create delta l,u for each x
+        # dimensions x, l, u
+
+        delta = np.identity(self.l.size)
+
+        ones = np.ones_like(Tn)
+
+        delta = np.einsum('xlu..., lu -> xlu...', ones, delta)
+
+        operator = delta - Tn * self.int_l
+
+        # dimensions x, l, u
+
+        operator = np.einsum('xlu... -> ...xlu', operator)
+
+        operator = np.linalg.inv(operator)
+
+        return operator
+
+
+    def get_V(self):
+        '''
+        Calculates effective velocity
+        Returns
+        -------
+        V : numpy array
+        '''
+        # dimensions x, l
+
+        u = 2 * self.l
+
+        k_dr = np.sum(self.operator, axis=-1)
+
+        omega_dr = np.einsum('...xlu, u -> ...xl', self.operator, u)
+
+        V = omega_dr / k_dr
+
+        return V
 
 
 class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):

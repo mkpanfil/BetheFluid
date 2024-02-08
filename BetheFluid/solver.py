@@ -1,5 +1,5 @@
 import numpy as np
-from BetheFluid.calc_Lieb_Liniger import VelocityLiebLiniger, DiffusionLiebLiniger
+from BetheFluid.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, DiffusionLiebLiniger
 from tqdm import tqdm
 import dill
 
@@ -108,7 +108,7 @@ class Solver:
     # return a dictionairy of chosen model
     def get_model(self, calculation, *args):
         model_classes = {
-            'Lieb-Liniger': {'velocity': VelocityLiebLiniger, 'diffusion': DiffusionLiebLiniger}
+            'Lieb-Liniger': {'TBA': TBA_LiebLiniger,'velocity': VelocityLiebLiniger, 'diffusion': DiffusionLiebLiniger}
             # Add more models and calculations as needed
         }
 

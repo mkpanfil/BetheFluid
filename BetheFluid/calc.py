@@ -2,10 +2,9 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 
-# Module containing abstract classes for calculating effective velocity and diffusion operator
+# Module containing abstract classes for calculating TBA, effective velocity and diffusion operator
 
-class CalcV(ABC):
-
+class TBA(ABC):
     def __init__(self, rho, l, c):
         self.rho = self.get_rho(rho)
         self.l = l
@@ -13,8 +12,7 @@ class CalcV(ABC):
         self.int_l = np.diff(self.l).mean()
         self.T = self.create_T()
         self.n, self.rho_tot = self.get_n_rho_tot()
-        self.operator = self.get_operator()
-        self.V = self.get_V()
+
 
     def get_rho(self, rho):
         '''
@@ -36,72 +34,25 @@ class CalcV(ABC):
     def create_T(self):
         pass
 
+    @abstractmethod
     def get_n_rho_tot(self):
-        '''
-        Calculates n and rho total
-        Returns
-        -------
-        n : numpy array
-        rho_tot : numpy array
-        '''
-        # new indices are rho: N, x, l
+        pass
 
-        rho_tot = 1 / (2 * np.pi) + np.einsum('lu..., xu... -> xl...', self.T, self.rho, optimize=True) * self.int_l
+class CalcV(TBA):
 
-        n = self.rho / rho_tot
+    def __init__(self, rho, l, c):
+        super().__init__(rho, l, c)
+        self.operator = self.get_operator()
+        self.V = self.get_V()
 
-        return n, rho_tot
-
+    @abstractmethod
     def get_operator(self):
-        '''
-        Creates 1 -Tn operator required for velocity calculations
-        Returns
-        -------
-        operator : numpy array
-        '''
+        pass
 
-        # dimensions : T(l,u) , n(x, u) -> Tn (x,l,u)
-        # Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
-
-        Tn = np.einsum('lu, xu... -> xlu...', self.T, self.n, optimize=True)
-
-        # create delta l,u for each x
-        # dimensions x, l, u
-
-        delta = np.identity(self.l.size)
-
-        ones = np.ones_like(Tn)
-
-        delta = np.einsum('xlu..., lu -> xlu...', ones, delta)
-
-        operator = delta - Tn * self.int_l
-
-        # dimensions x, l, u
-
-        operator = np.einsum('xlu... -> ...xlu', operator)
-
-        operator = np.linalg.inv(operator)
-
-        return operator
-
+    @abstractmethod
     def get_V(self):
-        '''
-        Calculates effective velocity
-        Returns
-        -------
-        V : numpy array
-        '''
-        # dimensions x, l
+        pass
 
-        u = 2 * self.l
-
-        k_dr = np.sum(self.operator, axis=-1)
-
-        omega_dr = np.einsum('...xlu, u -> ...xl', self.operator, u)
-
-        V = omega_dr / k_dr
-
-        return V
 
 
 class CalcD(CalcV):

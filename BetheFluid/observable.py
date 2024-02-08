@@ -12,17 +12,15 @@ class Observable:
 
         self.solver_object = self.get_object(Solver_object)
         # dimensions: l, x, t
-        self.calc_object = self.solver_object.get_model('velocity', self.solver_object.grid, self.solver_object.l,
-                                                        self.solver_object.c)
+        self.TBA_object = self.solver_object.get_model('TBA', self.solver_object.grid, self.solver_object.l,
+                                                       self.solver_object.c)
 
-        # CalcV(self.solver_object.grid, self.solver_object.l, self.solver_object.c)
-
-        self.T = self.calc_object.T
-        self.rho_tot = np.einsum('xlt -> lxt', self.calc_object.rho_tot)
-        self.n = np.einsum('xlt -> lxt', self.calc_object.n)
+        self.T = self.TBA_object.T
+        self.rho_tot = np.einsum('xlt -> lxt', self.TBA_object.rho_tot)
+        self.n = np.einsum('xlt -> lxt', self.TBA_object.n)
         self.rho_h = self.get_rho_h()
 
-    def get_object(self, inp) -> object:
+    def get_object(self, inp: Union[Solver, str]) -> Solver:
         '''
         loading Solver object into observable class
         Parameters
