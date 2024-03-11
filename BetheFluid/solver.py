@@ -2,11 +2,14 @@ import numpy as np
 from .calc import CalcV, CalcD
 from tqdm import tqdm
 import dill
+import BetheFluid.utils as uts
 
 
 class Solver:
 
-    def __init__(self, l=None, x=None, t=None, rho0=None, c=None, boundary=None, diff=False, potential=None):
+    def __init__(self, t=uts.t_diff, l=uts.l_grid, x=uts.x_grid, rho0=uts.foo1, c=uts.c_def, diff=True,
+                 potential=uts.potential_def,
+                 boundary=None):
         '''
         constructor of the class
         Parameters
@@ -30,32 +33,23 @@ class Solver:
         self.grid = self.create_initial_grid()
 
     def __str__(self):
+        informations = {
+            'coupling constant': self.c,
+            'time grid': 'Length: {}, average interval {}, final step {}'.format(self.t.size, np.mean(self.int_t),
+                                                                                 self.t[-1]),
+            'space grid': 'Length: {}, average interval {}, final step {}'.format(self.x.size, np.mean(self.x),
+                                                                                  self.x[-1]),
+            'diffusion': self.diff
+        }
 
-        informations = {'Coupling constant': self.c,
-                        'Time grid': 'Lenght: {}, average interval {}, final step {}'.format(self.t.size,
-                                                                                             np.mean(self.int_t),
-                                                                                             self.t[-1])}
+        printed_informations = '\n'.join([f"{key}: {value}" for key, value in informations.items()])
 
-        return 'Solver object: \n{}'.format(informations)
+        return 'Solver object:\n' + printed_informations
 
     def __add__(self, other):
 
-        first_is_bigger = np.all(self.t > other.t)
-
-        second_is_bigger = np.all(self.t < other.t)
-
-        if first_is_bigger or second_is_bigger:
-
-            self.t = np.append(self.t, other.t)
-
-            return self
-
-        else:
-
-            raise ValueError('Wrong time grids, cannot add those Solver objects')
-
-
-
+        self.t = np.append(self.t, other.t)
+        self.grid = np.append(self.grid, other.grid, axis=-1)
 
     def correct_l_x_t(self, l, x, t):
         '''
