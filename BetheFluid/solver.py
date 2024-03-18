@@ -1,12 +1,13 @@
 import numpy as np
-from .calc import CalcV, CalcD
+from BetheFluid.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, DiffusionLiebLiniger
 from tqdm import tqdm
 import dill
 
 
 class Solver:
 
-    def __init__(self, l=None, x=None, t=None, rho0=None, c=None, boundary=None, diff=False, potential=None):
+    def __init__(self, l=None, x=None, t=None, rho0=None, c=None, boundary=None, diff=False, potential=None,
+                 model='Lieb-Liniger'):
         '''
         constructor of the class
         Parameters
@@ -27,6 +28,7 @@ class Solver:
         self.int_x, self.int_t, self.int_l, self.steps_number = self.get_ints()
         self.diff = diff
         self.convergence = []
+        self.model = model
         self.grid = self.create_initial_grid()
 
     def correct_l_x_t(self, l, x, t):
@@ -103,6 +105,22 @@ class Solver:
 
         return int_x, int_t, int_l, steps_number
 
+    # return a dictionairy of chosen model
+    def get_model(self, calculation, *args):
+        model_classes = {
+            'Lieb-Liniger': {'TBA': TBA_LiebLiniger,'velocity': VelocityLiebLiniger, 'diffusion': DiffusionLiebLiniger}
+            # Add more models and calculations as needed
+        }
+
+        if self.model in model_classes:
+            model_class = model_classes[self.model].get(calculation)
+            if model_class:
+                return model_class(*args)
+            else:
+                raise ValueError(f"Invalid calculation type: {calculation}")
+        else:
+            raise ValueError(f"Invalid model type: {self.model}")
+
     # creates grid filled with initial condition
     def create_initial_grid(self):
         '''
@@ -137,7 +155,9 @@ class Solver:
 
         # calculating V using class CalcV
 
-        V = CalcV(rho, self.l, self.c).V
+        V = self.get_model('velocity', rho, self.l, self.c).V
+
+        #V = CalcV(rho, self.l, self.c).V
 
         # changing indices back to proper order
 
@@ -260,7 +280,9 @@ class Solver:
 
         rho = self.grid[Ellipsis, time]
 
-        Diff = CalcD(rho, self.l, self.c)
+        Diff = self.get_model('diffusion', rho, self.l, self.c)
+
+        #Diff = CalcD(rho, self.l, self.c)
 
         D, V = Diff.D, Diff.V  # dimensions N, x, momenta
 
@@ -328,8 +350,6 @@ class Solver:
         self.int_t = np.diff(self.t)
 
         self.solve_equation(path=path, starting_point=starting_point)
-
-
 
     def save_array(self, path):
         '''
