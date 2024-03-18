@@ -2,12 +2,14 @@ import numpy as np
 from BetheFluid.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, DiffusionLiebLiniger
 from tqdm import tqdm
 import dill
+import BetheFluid.utils as uts
 
 
 class Solver:
 
-    def __init__(self, l=None, x=None, t=None, rho0=None, c=None, boundary=None, diff=False, potential=None,
-                 model='Lieb-Liniger'):
+    def __init__(self, t=uts.t_diff, l=uts.l_grid, x=uts.x_grid, rho0=uts.foo1, c=uts.c_def, diff=True,
+                 potential=uts.potential_def,
+                 boundary=None, model='Lieb-Liniger'):
         '''
         constructor of the class
         Parameters
@@ -30,6 +32,25 @@ class Solver:
         self.convergence = []
         self.model = model
         self.grid = self.create_initial_grid()
+
+    def __str__(self):
+        informations = {
+            'coupling constant': self.c,
+            'time grid': 'Length: {}, average interval {}, final step {}'.format(self.t.size, np.mean(self.int_t),
+                                                                                 self.t[-1]),
+            'space grid': 'Length: {}, average interval {}, final step {}'.format(self.x.size, np.mean(self.x),
+                                                                                  self.x[-1]),
+            'diffusion': self.diff
+        }
+
+        printed_informations = '\n'.join([f"{key}: {value}" for key, value in informations.items()])
+
+        return 'Solver object:\n' + printed_informations
+
+    def __add__(self, other):
+
+        self.t = np.append(self.t, other.t)
+        self.grid = np.append(self.grid, other.grid, axis=-1)
 
     def correct_l_x_t(self, l, x, t):
         '''
@@ -350,6 +371,8 @@ class Solver:
         self.int_t = np.diff(self.t)
 
         self.solve_equation(path=path, starting_point=starting_point)
+
+
 
     def save_array(self, path):
         '''
