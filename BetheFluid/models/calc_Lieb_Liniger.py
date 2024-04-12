@@ -10,13 +10,13 @@ class TBA_LiebLiniger(TBA):
         -------
         numpy array, integral kernel of GHD
         '''
-        l, u = np.meshgrid(self.l, self.l, indexing='ij')
+        l, u = np.meshgrid(self.miu_grid, self.miu_grid, indexing='ij')
 
-        T = self.c / np.pi * 1 / ((l - u) ** 2 + self.c ** 2)
+        T = self.coupling / np.pi * 1 / ((l - u) ** 2 + self.coupling ** 2)
 
         return T
 
-    def get_n_rho_tot(self):
+    def calc_n_rho_tot(self):
         '''
         Calculates n and rho total
         Returns
@@ -26,7 +26,7 @@ class TBA_LiebLiniger(TBA):
         '''
         # new indices are rho: N, x, l
 
-        rho_tot = 1 / (2 * np.pi) + np.einsum('lu..., xu... -> xl...', self.T, self.rho, optimize=True) * self.int_l
+        rho_tot = 1 / (2 * np.pi) + np.einsum('lu..., xu... -> xl...', self.T, self.rho, optimize=True) * self.dl
 
         n = self.rho / rho_tot
 
@@ -53,13 +53,13 @@ class VelocityLiebLiniger(CalcV, TBA_LiebLiniger):
         # create delta l,u for each x
         # dimensions x, l, u
 
-        delta = np.identity(self.l.size)
+        delta = np.identity(self.miu_grid.size)
 
         ones = np.ones_like(Tn)
 
         delta = np.einsum('xlu..., lu -> xlu...', ones, delta)
 
-        operator = delta - Tn * self.int_l
+        operator = delta - Tn * self.dl
 
         # dimensions x, l, u
 
@@ -79,7 +79,7 @@ class VelocityLiebLiniger(CalcV, TBA_LiebLiniger):
         '''
         # dimensions x, l
 
-        u = 2 * self.l
+        u = 2 * self.miu_grid
 
         k_dr = np.sum(self.operator, axis=-1)
 
@@ -121,12 +121,12 @@ class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):
         -------
         D_ker : numpy array
         '''
-        delta = np.identity(self.l.size)[np.newaxis, Ellipsis]
+        delta = np.identity(self.miu_grid.size)[np.newaxis, Ellipsis]
 
         rho_tot = self.rho_tot[Ellipsis, np.newaxis]
 
         # dimensions x, l, u
-        D_ker = (delta * self.w[Ellipsis, np.newaxis] - self.W * self.int_l) / rho_tot ** 2
+        D_ker = (delta * self.w[Ellipsis, np.newaxis] - self.W * self.dl) / rho_tot ** 2
 
         return D_ker
 
@@ -139,9 +139,9 @@ class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):
         '''
         Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
 
-        delta = np.identity(self.l.size)[np.newaxis, Ellipsis]
+        delta = np.identity(self.miu_grid.size)[np.newaxis, Ellipsis]
 
-        op_ker = delta - Tn * self.int_l
+        op_ker = delta - Tn * self.dl
 
         rho_factor = self.rho_tot[Ellipsis, np.newaxis] / self.rho_tot[Ellipsis, np.newaxis, :]
 
@@ -151,8 +151,6 @@ class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):
 
         return D
 
-
-# Changes:  rho_factor is in different place and D_ker is devided by rho_tot**2
 
 
 
