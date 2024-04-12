@@ -12,13 +12,13 @@ class Observable:
 
         self.solver_object = self.get_object(Solver_object)
         # dimensions: l, x, t
-        self.TBA_object = self.solver_object.get_model('TBA', self.solver_object.grid, self.solver_object.l,
-                                                       self.solver_object.c)
+        self.TBA_object = self.solver_object.get_model('TBA', self.solver_object.grid, self.solver_object.miu_grid,
+                                                       self.solver_object.coupling)
 
         self.T = self.TBA_object.T
         self.rho_tot = np.einsum('xlt -> lxt', self.TBA_object.rho_tot)
         self.n = np.einsum('xlt -> lxt', self.TBA_object.n)
-        self.rho_h = self.get_rho_h()
+        self.rho_h = self.calc_rho_h()
 
     def get_object(self, inp: Union[Solver, str]) -> Solver:
         '''
@@ -41,7 +41,7 @@ class Observable:
         else:
             return inp
 
-    def get_rho_h(self):
+    def calc_rho_h(self):
 
         rho_h = self.rho_tot - self.solver_object.grid
 
@@ -50,9 +50,9 @@ class Observable:
     def __calc_template(self, observable, option):
 
         option_mapping = {
-            'local': (np.sum(observable, axis=0) * self.solver_object.int_l),
-            'theta': (np.sum(observable, axis=1) * self.solver_object.int_x),
-            'total': (np.sum(observable, axis=(0, 1)) * self.solver_object.int_l * self.solver_object.int_x)
+            'local': (np.sum(observable, axis=0) * self.solver_object.dl),
+            'theta': (np.sum(observable, axis=1) * self.solver_object.dx),
+            'total': (np.sum(observable, axis=(0, 1)) * self.solver_object.dl * self.solver_object.dx)
         }
 
         if option not in option_mapping:
@@ -65,7 +65,7 @@ class Observable:
     def calc_energy(self, option='total'):
         # Dimensions l, x, t
 
-        l = self.solver_object.l[:, np.newaxis, np.newaxis]
+        l = self.solver_object.miu_grid[:, np.newaxis, np.newaxis]
         energy_grid = self.solver_object.grid * l ** 2
         if self.solver_object.potential is not None:
             energy_grid += self.solver_object.grid * self.solver_object.potential[Ellipsis, np.newaxis]
@@ -92,27 +92,27 @@ class Observable:
 
         main_options_dictionairy = {
             'n': {
-                'local': {'x_axis': self.solver_object.x, 'y_axis': self.calc_n('local'), 'x_label': 'x',
+                'local': {'x_axis': self.solver_object.x_grid, 'y_axis': self.calc_n('local'), 'x_label': 'x',
                           'y_label': 'n'},
-                'theta': {'x_axis': self.solver_object.l, 'y_axis': self.calc_n('theta'), 'x_label': 'theta',
+                'theta': {'x_axis': self.solver_object.miu_grid, 'y_axis': self.calc_n('theta'), 'x_label': 'theta',
                           'y_label': 'n'},
-                'total': {'x_axis': self.solver_object.t, 'y_axis': self.calc_n('total'), 'x_label': 'time',
+                'total': {'x_axis': self.solver_object.t_grid, 'y_axis': self.calc_n('total'), 'x_label': 'time',
                           'y_label': 'n'}},
 
             'energy': {
-                'local': {'x_axis': self.solver_object.x, 'y_axis': self.calc_energy('local'), 'x_label': 'x',
+                'local': {'x_axis': self.solver_object.x_grid, 'y_axis': self.calc_energy('local'), 'x_label': 'x',
                           'y_label': 'energy'},
-                'theta': {'x_axis': self.solver_object.l, 'y_axis': self.calc_energy('theta'), 'x_label': 'theta',
+                'theta': {'x_axis': self.solver_object.miu_grid, 'y_axis': self.calc_energy('theta'), 'x_label': 'theta',
                           'y_label': 'energy'},
-                'total': {'x_axis': self.solver_object.t, 'y_axis': self.calc_energy('total'), 'x_label': 'time',
+                'total': {'x_axis': self.solver_object.t_grid, 'y_axis': self.calc_energy('total'), 'x_label': 'time',
                           'y_label': 'energy'}},
 
             'entropy': {
-                'local': {'x_axis': self.solver_object.x, 'y_axis': self.calc_entropy('local'), 'x_label': 'x',
+                'local': {'x_axis': self.solver_object.x_grid, 'y_axis': self.calc_entropy('local'), 'x_label': 'x',
                           'y_label': 'entropy'},
-                'theta': {'x_axis': self.solver_object.l, 'y_axis': self.calc_entropy('theta'), 'x_label': 'theta',
+                'theta': {'x_axis': self.solver_object.miu_grid, 'y_axis': self.calc_entropy('theta'), 'x_label': 'theta',
                           'y_label': 'entropy'},
-                'total': {'x_axis': self.solver_object.t, 'y_axis': self.calc_entropy('total'), 'x_label': 'time',
+                'total': {'x_axis': self.solver_object.t_grid, 'y_axis': self.calc_entropy('total'), 'x_label': 'time',
                           'y_label': 'entropy'}}
         }
 
@@ -131,7 +131,7 @@ class Observable:
         else:
             for item in frames:
                 plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, item], style,
-                         label='{} t = {}'.format(name, round(self.solver_object.t[item], 3)))
+                         label='{} t = {}'.format(name, round(self.solver_object.t_grid[item], 3)))
             plt.xlabel(option_mapping[option]['x_label'])
             plt.ylabel(option_mapping[option]['y_label'])
             plt.legend()

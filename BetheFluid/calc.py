@@ -2,19 +2,21 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 
-# Module containing abstract classes for calculating TBA, effective velocity and diffusion operator
+###############################################################################################################
+#          Module containing abstract classes for calculating TBA, effective velocity and diffusion operator
+###############################################################################################################
 
 class TBA(ABC):
     def __init__(self, rho, l, c):
-        self.rho = self.get_rho(rho)
-        self.l = l
-        self.c = c
-        self.int_l = np.diff(self.l).mean()
+        self.rho = self.calc_rho(rho)
+        self.miu_grid = l
+        self.coupling = c
+        self.dl = np.diff(self.miu_grid).mean()
         self.T = self.create_T()
-        self.n, self.rho_tot = self.get_n_rho_tot()
+        self.n, self.rho_tot = self.calc_n_rho_tot()
 
 
-    def get_rho(self, rho):
+    def calc_rho(self, rho):
         '''
         Changes dimensions order, to more useful in further calculations
         Parameters
@@ -35,7 +37,7 @@ class TBA(ABC):
         pass
 
     @abstractmethod
-    def get_n_rho_tot(self):
+    def calc_n_rho_tot(self):
         pass
 
 class CalcV(TBA):
@@ -58,19 +60,12 @@ class CalcV(TBA):
 class CalcD(CalcV):
 
     def __init__(self, rho, l, c):
-        '''
-        Constructor of this class
-        Parameters
-        ----------
-        rho : numpy array, state at given time
-        l : numpy array, momenta dimension
-        c : tuple of floats, coupling constants
-        '''
+
         super().__init__(rho, l, c)
 
         # dimensions N, x, l
         self.W = self.get_W()
-        self.w = np.sum(self.W, axis=-2) * self.int_l
+        self.w = np.sum(self.W, axis=-2) * self.dl
         self.D_ker = self.get_D_ker()
         self.D = self.get_D()
 

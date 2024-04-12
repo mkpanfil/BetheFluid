@@ -1,8 +1,9 @@
 import numpy as np
 
 
-# initial state
-
+##################################################################################
+#                   Data for creating default Solver object
+##################################################################################
 def foo1(l, x):
     rho = (2 + 0.25 * np.cos(2 * x * np.pi)) * (
             1 / (1 + np.exp(2 * (l + 2.4) ** 2 - 3)) + 1 / (1 + np.exp(2 * (l - 2.4) ** 2 - 3))) / (
@@ -27,3 +28,38 @@ c_def = 3
 
 rho = foo1
 
+##################################################################################
+#                   Basic math functions used in modules
+##################################################################################
+
+def x_der(arr, dx):
+    '''
+    Calculates the derivative in position space
+    Parameters
+    ----------
+    arr : numpy array of the grid at given time
+    dx : numpy array of the spacing of the grid
+    Returns
+    -------
+    numpy array which is a derivative in x dimension of inputted arr
+    '''
+    der = 1 / (2 * dx) * (np.roll(arr, -1, axis=-1) - np.roll(arr, 1, axis=-1))
+
+    return der
+
+
+def lambda_der(arr, dl):
+    '''
+    Calculates the derivative in momentum space
+
+    Parameters
+    ----------
+    arr : numpy array of the grid at given time
+    dl: spacing of the grid
+    Returns
+    -------
+    numpy array which is a derivative in l dimension of inputted arr
+    '''
+    der = 1 / (2 * dl) * (np.roll(arr, -1, axis=-2) - np.roll(arr, 1, axis=-2))
+
+    return der

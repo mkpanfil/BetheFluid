@@ -1,32 +1,71 @@
 import numpy as np
-from .calc import CalcV, CalcD
+from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, DiffusionLiebLiniger
 from tqdm import tqdm
 import dill
+import BetheFluid.utils as uts
 
 
 class Solver:
 
-    def __init__(self, l=None, x=None, t=None, rho0=None, c=None, boundary=None, diff=False, potential=None):
+    # x_grid, t_grid, miu_grid
+    def __init__(self, t_grid=uts.t_diff, miu_grid=uts.l_grid, x_grid=uts.x_grid, rho0=uts.foo1, coupling=uts.c_def,
+                 diff=True,
+                 potential=uts.potential_def,
+                 boundary=None, model='Lieb-Liniger'):
         '''
         constructor of the class
         Parameters
         ----------
-        l : list or numpy array
-        x : list or numpy array
-        t : list or numpy array
-        rho0 : function or tuple of functions
-        c : float or tuple of floats
+        miu_grid : list or numpy array
+        x_grid : list or numpy array
+        t_grid : list or numpy array
+        rho0 : function
+        coupling : float
         boundary : None or tuple
         diff : bool
         '''
-        self.l, self.x, self.t = self.correct_l_x_t(l, x, t)
-        self.c, self.rho0 = self.to_tuple(c, rho0)
+        self.miu_grid, self.x_grid, self.t_grid = self.correct_l_x_t(miu_grid, x_grid, t_grid)
+        self.coupling = coupling
+        self.rho0 = rho0
         self.boundary = self.correct_boundary(boundary)
-        self.potential = self.get_potential(potential)
-        self.int_x, self.int_t, self.int_l, self.steps_number = self.get_ints()
+        self.potential = self.calc_potential(potential)
+        self.dx, self.dt, self.dl, self.steps_number = self.get_grid_spacing()
         self.diff = diff
         self.convergence = []
+        self.model = model
         self.grid = self.create_initial_grid()
+
+    def __str__(self):
+        """
+        Overloads print function to type informations about Solver Object
+        """
+        informations = {
+            'coupling constant': self.coupling,
+            'time grid': 'Length: {}, average interval {}, final step {}'.format(self.t_grid.size, np.mean(self.dt),
+                                                                                 self.t_grid[-1]),
+            'space grid': 'Length: {}, average interval {}, final step {}'.format(self.x_grid.size,
+                                                                                  np.mean(self.x_grid),
+                                                                                  self.x_grid[-1]),
+            'diffusion': self.diff
+        }
+
+        printed_informations = '\n'.join([f"{key}: {value}" for key, value in informations.items()])
+
+        return 'Solver object:\n' + printed_informations
+
+    def __add__(self, other):
+        """
+        Overloading + operator concatenating grids of Solver objects
+        Parameters
+        ----------
+        other: another solver object
+
+        Returns
+        -------
+        One solver object, which combines grids of both objects
+        """
+        self.t_grid = np.append(self.t_grid, other.t_grid)
+        self.grid = np.append(self.grid, other.grid, axis=-1)
 
     def correct_l_x_t(self, l, x, t):
         '''
@@ -77,73 +116,80 @@ class Solver:
 
         return boundary
 
-    def get_potential(self, potential):
+    def calc_potential(self, potential):
+        """
+        Adapts potential function to the modules requirements
+        Parameters
+        ----------
+        potential: function
+
+        Returns
+        -------
+        potential: array of the potential, which dimensions are adapted for all modules
+        """
 
         if potential is not None:
-            potential = potential(self.x)[np.newaxis, np.newaxis, :]
+            potential = potential(self.x_grid)[np.newaxis, :]
 
         return potential
 
-    def to_tuple(self, c, rho0):
+    def get_grid_spacing(self):
         '''
-        ensures that c and rho0 are tuple and have this same size
-        Parameters
-        ----------
-        c
-        rho0
-
+        Extracts required spacing from x,t, momenta grids
         Returns
         -------
-        c and rho0 as tuple
-        '''
-        if isinstance(c, tuple) == False:
-            c = (c,)
-
-        if isinstance(rho0, tuple) == False:
-            rho0 = (rho0,)
-
-        if len(c) != len(rho0):
-            raise TypeError('c and rho0 have to have this same size')
-
-        return c, rho0
-
-    def get_ints(self):
-        '''
-        extracts required data from x,t grids
-        Returns
-        -------
-        int_x, int_l, int_t : floats representing spacing in dimensions
+        dx, dl : floats, representing spacing in dimensions
+        dt : array, representing spacing in time
         steps_number : int, number of time iterations
         '''
-        int_x = np.diff(self.x).mean()
+        dx = np.diff(self.x_grid).mean()
 
-        int_t = np.diff(self.t).mean()
+        dt = np.diff(self.t_grid)
 
-        int_l = np.diff(self.l).mean()
+        dl = np.diff(self.miu_grid).mean()
 
-        steps_number = self.t.size
+        steps_number = self.t_grid.size
 
-        return int_x, int_t, int_l, steps_number
+        return dx, dt, dl, steps_number
 
-    # creates grid filled with initial condition
-    def create_initial_grid(self):
-        '''
+    def get_model(self, calculation, *args):
+        """
+        Associates chosen integrable model with proper modules, calculating
+        Parameters
+        ----------
+        calculation
+        args
+
         Returns
         -------
-        numpy array which is solution grid filled only with initial state
+
+        """
+        model_classes = {
+            'Lieb-Liniger': {'TBA': TBA_LiebLiniger, 'velocity': VelocityLiebLiniger, 'diffusion': DiffusionLiebLiniger}
+            # Add more models and calculations as needed
+        }
+
+        if self.model in model_classes:
+            model_class = model_classes[self.model].get(calculation)
+            if model_class:
+                return model_class(*args)
+            else:
+                raise ValueError(f"Invalid calculation type: {calculation}")
+        else:
+            raise ValueError(f"Invalid model type: {self.model}")
+
+    def create_initial_grid(self):
         '''
-        # dimensions: N, l, x, t
+        Creates initial grid filled with initial conditions
+        Returns
+        -------
+        grid: numpy array which is a grid for whole calculation filled only with initial state
+        '''
+        # dimensions: l, x, t
 
-        grid = np.zeros((len(self.c), self.l.size, self.x.size, self.t.size))
+        grid = np.zeros((self.miu_grid.size, self.x_grid.size, self.t_grid.size))
 
-        N_dim = []
-
-        for item in self.rho0:
-            N = item(self.l[:, np.newaxis], self.x[np.newaxis, :])
-
-            N_dim.append(N)
-
-        initial_state = np.stack(N_dim)
+        initial_state = self.rho0(self.miu_grid[:, np.newaxis], self.x_grid[np.newaxis, :])
 
         grid[Ellipsis, 0] = initial_state
 
@@ -154,25 +200,27 @@ class Solver:
 
         Parameters
         ----------
-        time : int
+        time : int, defines position in time for which the calculation will be done
 
         Returns
         -------
         numpy array which is a matrix required for implicit solving of GHD
         '''
-        # dimensions N, l, x for rho and V
+        # dimensions l, x for rho and V
 
         rho = self.grid[Ellipsis, time]
 
         # calculating V using class CalcV
 
-        V = CalcV(rho, self.l, self.c).V
+        V = self.get_model('velocity', rho, self.miu_grid, self.coupling).V
+
+        # V = CalcV(rho, self.l, self.c).V
 
         # changing indices back to proper order
 
-        V = np.einsum('Nxl -> Nlx', V)
+        V = np.einsum('xl -> lx', V)
 
-        h = self.int_t / (2 * self.int_x)
+        h = self.dt[time] / (2 * self.dx)
 
         V_V_h = h * V[Ellipsis, np.newaxis, :] * np.ones_like(V)[Ellipsis, np.newaxis]
 
@@ -181,26 +229,24 @@ class Solver:
         np.fill_diagonal(off_diagonal[:, 1:], 1)
         np.fill_diagonal(off_diagonal[1:, 0:], -1)
 
-        off_diagonal = V_V_h * off_diagonal[np.newaxis, np.newaxis, Ellipsis]
+        off_diagonal = V_V_h * off_diagonal[np.newaxis, Ellipsis]
 
         diagonal = np.zeros((V_V_h.shape[-1], V_V_h.shape[-1]))
 
         np.fill_diagonal(diagonal, 1)
 
-        diagonal = np.ones_like(V_V_h) * diagonal[np.newaxis, np.newaxis, Ellipsis]
+        diagonal = np.ones_like(V_V_h) * diagonal[np.newaxis, Ellipsis]
 
         matrix = diagonal + off_diagonal
 
         if self.boundary is None:
 
             matrix[Ellipsis, 0, -1] = -V_V_h[Ellipsis, 0, -1]
-
             matrix[Ellipsis, -1, 0] = V_V_h[Ellipsis, -1, 0]
 
         else:
 
             matrix[Ellipsis, 0, 0] = self.boundary[0]
-
             matrix[Ellipsis, 0, 1] = 0
 
             matrix[Ellipsis, -1, -1] = self.boundary[1]
@@ -208,39 +254,7 @@ class Solver:
 
         return matrix
 
-    def x_der(self, arr):
-        '''
-
-        Parameters
-        ----------
-        arr : numpy array of the grid at given time
-
-        Returns
-        -------
-        numpy array which is a derivative in x dimension of inputted arr
-        '''
-        der = 1 / (2 * self.int_x) * (np.roll(arr, -1, axis=-1) - np.roll(arr, 1, axis=-1))
-
-        # der = np.gradient(arr, self.int_x, axis = -1)
-
-        return der
-
-    def lambda_der(self, arr):
-        '''
-
-        Parameters
-        ----------
-        arr : numpy array of the grid at given time
-
-        Returns
-        -------
-        numpy array which is a derivative in l dimension of inputted arr
-        '''
-        der = 1 / (2 * self.int_l) * (np.roll(arr, -1, axis=-2) - np.roll(arr, 1, axis=-2))
-
-        return der
-
-    def diff_fixed_point_func(self, rho, rho_next, D, V):
+    def diff_fixed_point_func(self, rho, rho_next, D, V, time):
         '''
         functions utilizing fixed point iteration method for solving GHD with diffusion
         Parameters
@@ -252,24 +266,27 @@ class Solver:
 
         Returns
         -------
-
+        foo : array utilized for solving GHD
+        diff : array containing the mean difference between initial function and returned function
         '''
         diff = rho_next
 
-        # D, V dimensions N, x, momenta
+        # D, V dimensions x, momenta
 
-        D_op = np.einsum('Nxos, Nsx -> Nox', D, self.x_der(rho_next), optimize=True)
+        Diffusion_op = np.einsum('xos, sx -> ox', D, uts.x_der(rho_next, self.dx), optimize=True)
 
-        V_rho = np.einsum('Nxl, Nlx -> Nlx', V, rho_next, optimize=True)
+        V_rho = np.einsum('xl, lx -> lx', V, rho_next, optimize=True)
 
         if self.potential is None:
 
-            foo = rho + self.int_t * (self.x_der(D_op) / 2 - self.x_der(V_rho))
+            foo = rho + self.dt[time] * (uts.x_der(Diffusion_op, self.dx) / 2 - uts.x_der(V_rho, self.dx))
 
         else:
 
-            foo = rho + self.int_t * (
-                    self.x_der(D_op) / 2 - self.x_der(V_rho) + self.x_der(self.potential) * self.lambda_der(rho))
+            foo = rho + self.dt[time] * (
+                    uts.x_der(Diffusion_op, self.dx) / 2 - uts.x_der(V_rho, self.dx) + uts.x_der(self.potential,
+                                                                                                 self.dx) * uts.lambda_der(
+                rho, self.dl))
 
         diff = np.abs(diff - foo).mean()
 
@@ -284,52 +301,52 @@ class Solver:
 
         Returns
         -------
-        rho_next: numpy array, state at another time
+        rho_next: numpy array, state at further time
         diff : list, collects convergence of the method
         '''
         rho_next = self.grid[Ellipsis, time]
 
         rho = self.grid[Ellipsis, time]
 
-        Diff = CalcD(rho, self.l, self.c)
+        Diff = self.get_model('diffusion', rho, self.miu_grid, self.coupling)
+
+        # Diff = CalcD(rho, self.l, self.c)
 
         D, V = Diff.D, Diff.V  # dimensions N, x, momenta
 
         diff = []
 
         for i in range(15):
-            rho_next, difference = self.diff_fixed_point_func(rho, rho_next, D, V)
+            rho_next, difference = self.diff_fixed_point_func(rho, rho_next, D, V, time)
 
             diff.append(difference)
 
         return rho_next, diff
 
-    def solve_equation(self, path=None):
+    def solve_equation(self, path=None, starting_point=0):
         '''
-        Function solving GHD or GHD with diffusion using previous methods
+        Main function evolving the state
         Parameters
         ----------
         path : optional string, if is not None, Solver objects is saved to localization
 
-        Returns
-
-        numpy array which is solution to GHD equations
         -------
 
         '''
+
         if self.diff is False:
 
-            for time in tqdm(range(self.t.size - 1)):
-                matrix = self.create_matrix(time)
+            for time_step in tqdm(range(starting_point, self.grid.shape[-1] - 1)):
+                matrix = self.create_matrix(time_step)
 
-                self.grid[Ellipsis, time + 1] = np.linalg.solve(matrix, self.grid[Ellipsis, time])
+                self.grid[Ellipsis, time_step + 1] = np.linalg.solve(matrix, self.grid[Ellipsis, time_step])
 
         else:
 
-            for time in tqdm(range(self.t.size - 1)):
-                rho_next, diff = self.diff_equ(time)
+            for time_step in tqdm(range(starting_point, self.grid.shape[-1] - 1)):
+                rho_next, diff = self.diff_equ(time_step)
 
-                self.grid[Ellipsis, time + 1] = rho_next
+                self.grid[Ellipsis, time_step + 1] = rho_next
 
                 self.convergence.append(diff)
 
@@ -337,9 +354,43 @@ class Solver:
             with open(path, 'wb') as file:
                 dill.dump(self, file)
 
+    def continue_calculations(self, elongation_factor, time_array=None, path=None):
+        """
+        Elongates the solution of GHD equations, either by extending existing time grid by a factor or by concatenating specified
+        new time grid
+
+        Parameters
+        ----------
+        elongation_factor : float, specifies how much the time grid should be elongated
+        time_array : array in time grid which should be concatenated with the existing one
+        path : sting, if not None, calculation will be saved to the localization directed by path
+
+        -------
+
+        """
+        if time_array is None:
+
+            new_t = np.arange(self.t_grid[-1] + np.mean(self.dt), self.t_grid[-1] * (1 + elongation_factor),
+                              np.mean(self.dt))
+
+        else:
+            new_t = time_array
+
+        new_grid = np.zeros((self.miu_grid.size, self.x_grid.size, new_t.size))
+
+        self.grid = np.concatenate((self.grid, new_grid), axis=-1)
+
+        starting_point = self.t_grid.size - 1
+
+        self.t_grid = np.hstack((self.t_grid, new_t))
+
+        self.dt = np.diff(self.t_grid)
+
+        self.solve_equation(path=path, starting_point=starting_point)
+
     def save_array(self, path):
         '''
-        Saves array of the solutin
+        Saves array of the solution as a binary dill file
         Parameters
         ----------
         path : string, location to which array is saved
