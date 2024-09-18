@@ -214,8 +214,6 @@ class Solver:
 
         V = self.get_model('velocity', rho, self.miu_grid, self.coupling).V
 
-        # V = CalcV(rho, self.l, self.c).V
-
         # changing indices back to proper order
 
         V = np.einsum('xl -> lx', V)
