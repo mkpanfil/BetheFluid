@@ -52,3 +52,5 @@ This project is licensed under the MIT License - see the license.txt file for de
 ---
 
 We follow the PEP 8 Style guide for Python and the Style guide of numpy.
+
+Development of the package was possible thanks to the support of the National Science Center (NCN), Poland via projects 2018/31/D/ST3/03588 and 2022/47/B/ST2/03334.
