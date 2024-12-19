@@ -44,7 +44,7 @@ class CalcV(TBA):
 
     def __init__(self, rho, l, c):
         super().__init__(rho, l, c)
-        self.operator = self.get_operator()
+        self.operator = self.get_operator(n=self.n)
         self.V = self.get_V()
 
     @abstractmethod

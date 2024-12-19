@@ -1,6 +1,6 @@
 import numpy as np
+from scipy.optimize import root
 from BetheFluid.calc import TBA, CalcV, CalcD
-
 
 
 class TBA_LiebLiniger(TBA):
@@ -32,12 +32,13 @@ class TBA_LiebLiniger(TBA):
 
         return n, rho_tot
 
+
 class VelocityLiebLiniger(CalcV, TBA_LiebLiniger):
     '''
     Class calculating effective velocity of given state rho
     '''
 
-    def get_operator(self):
+    def get_operator(self, n):
         '''
         Creates 1 -Tn operator required for velocity calculations
         Returns
@@ -48,7 +49,7 @@ class VelocityLiebLiniger(CalcV, TBA_LiebLiniger):
         # dimensions : T(l,u) , n(x, u) -> Tn (x,l,u)
         # Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
 
-        Tn = np.einsum('lu, xu... -> xlu...', self.T, self.n, optimize=True)
+        Tn = np.einsum('lu, xu... -> xlu...', self.T, n, optimize=True)
 
         # create delta l,u for each x
         # dimensions x, l, u
@@ -68,7 +69,6 @@ class VelocityLiebLiniger(CalcV, TBA_LiebLiniger):
         operator = np.linalg.inv(operator)
 
         return operator
-
 
     def get_V(self):
         '''
@@ -152,5 +152,148 @@ class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):
         return D
 
 
+class Relaxation_time_approximation(DiffusionLiebLiniger):
+
+    def __init__(self, rho, l, c, potential):
+        super().__init__(rho, l, c)
+
+        self.potential = potential
+
+    # lambda last dimension
+    def calc_particle_density(self, rho_p):
+        integrated_density = np.sum(rho_p, axis=-1) * self.dl
+
+        return integrated_density
+
+    def calc_momentum(self, rho_p):
+        momentum = self.miu_grid[np.newaxis, :] * rho_p
+
+        integrated_momentum = np.sum(momentum, axis=-1) * self.dl
+
+        return integrated_momentum
+
+    def calc_energy(self, rho_p):
+        potential = np.einsum('ij -> ji', self.potential)
+
+        energy = (self.miu_grid[np.newaxis, :] ** 2 + potential) * rho_p
+
+        #energy = (self.miu_grid[np.newaxis, :] ** 2) * rho_p
+
+        integrated_energy = np.sum(energy, axis=-1) * self.dl
+
+        return integrated_energy
+
+    def calc_equillibrium_state(self, eps0):
+        eps = eps0
+
+        error = 1
+
+        while error > 1e-6:
+            kernel = self.T[np.newaxis, Ellipsis] * np.log(1.0 + np.exp(-eps))[:, np.newaxis, :]
+            new_eps = eps0 - np.sum(kernel, axis=-1) * self.dl
+            error = np.mean(np.sum(np.abs(new_eps - eps), axis=1) * self.dl)
+            eps = new_eps
+
+        return eps
+
+    def calc_rho_from_eps(self, eps):
+        n = 1 / (1 + np.exp(eps))
+
+        operator = self.get_operator(n)
+
+        rho_tot = 1 / (2 * np.pi) * np.sum(operator, axis=-1)
+
+        rho_calculated = n * rho_tot
+
+        return rho_calculated
+
+    def calc_potentials_for_rho_boosted(self):
+        # Precompute target density, momentum, and energy from self.rho
+        target_density = self.calc_particle_density(self.rho)
+
+        momentum = self.calc_momentum(self.rho)
+        energy = self.calc_energy(self.rho)
+
+        target_energy = energy - momentum ** 2 / (2 * target_density)
+
+        def equation_to_solve(params):
+            params = params.reshape(2, self.rho.shape[0])
+
+            # Calculate epsilon
+            eps0 = params[0, :, np.newaxis] + params[1, :, np.newaxis] * self.miu_grid[np.newaxis, :] ** 2
+
+            eps = self.calc_equillibrium_state(eps0)
+
+            # Calculate rho and derived quantities
+            rho_calculated = self.calc_rho_from_eps(eps)
+
+            density_calculated = self.calc_particle_density(rho_calculated)
+            energy_calculated = self.calc_energy(rho_calculated)
+
+            residual_density = (density_calculated - target_density)/np.max(target_density)
+            residual_energy = (energy_calculated - target_energy)/np.max(target_energy)
+
+            # print(residual_density)
+            # print('\n')
+            # print(residual_energy)
+            # print('end of the loop \n')
+            #
+            # print(density_calculated)
+            # print('\n')
+            # print(energy_calculated)
+            # print('next loop \n')
+            #
+            # print(params)
+            # print('Next loop \n')
+            # Return residuals
+            return np.concatenate([residual_density.ravel(), residual_energy.ravel()])
+
+        beta_0 = np.ones_like(self.rho[:, 0])
+        beta_1 = np.ones_like(self.rho[:, 0])
+        # Solve using root
+        initial_guess = np.stack((beta_0, beta_1)).reshape(-1)
+        result = root(equation_to_solve, initial_guess,
+                      method='hybr', tol=10**(-3))  # Here maybe it is worth considering the different methods
+
+        if not result.success:
+            raise ValueError(f"Root finding failed: {result.message}")
+
+        return result.x.reshape(2, self.rho.shape[0])
+
+    def calc_collision_integral(self):
+        pass
 
 
+if __name__ == '__main__':
+    from BetheFluid import solver
+    import matplotlib.pyplot as plt
+
+    #path = '../../tests/fixtures/diffusion.pkl'
+
+    l = np.linspace(-10,10)
+
+    object = solver.Solver(miu_grid=l)
+
+    rho = object.grid[:, :, 0]
+
+    relax = Relaxation_time_approximation(rho, object.miu_grid, object.coupling, object.potential)
+
+    susceptibiliteis = relax.calc_potentials_for_rho_boosted()
+
+    eps0 = susceptibiliteis[0, :, np.newaxis] + susceptibiliteis[1, :, np.newaxis] * object.miu_grid[np.newaxis, :] ** 2
+
+    eps = relax.calc_equillibrium_state(eps0)
+
+    rho_boosted = relax.calc_rho_from_eps(eps)
+
+    plt.plot(object.miu_grid, relax.rho[0, :], '--', label='rho x=1')
+    plt.plot(object.miu_grid, relax.rho[5, :], '--', label='rho x=5')
+    plt.plot(object.miu_grid, relax.rho[15, :], '--', label='rho x=15')
+
+    plt.plot(object.miu_grid, rho_boosted[0, :], label='rho boost x=1')
+    plt.plot(object.miu_grid, rho_boosted[5, :], label='rho boost x=5')
+    plt.plot(object.miu_grid, rho_boosted[15, :], label='rho boost x=15')
+    plt.xlabel('momenta')
+    plt.legend()
+
+    plt.show()

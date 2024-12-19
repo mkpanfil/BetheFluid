@@ -46,6 +46,7 @@ class Solver:
             'space grid': 'Length: {}, average interval {}, final step {}'.format(self.x_grid.size,
                                                                                   np.mean(self.x_grid),
                                                                                   self.x_grid[-1]),
+
             'diffusion': self.diff
         }
 
