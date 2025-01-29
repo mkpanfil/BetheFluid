@@ -1,15 +1,17 @@
 import numpy as np
-from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, DiffusionLiebLiniger
+from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, DiffusionLiebLiniger, \
+    Relaxation_time_approximation
 from tqdm import tqdm
 import dill
 import BetheFluid.utils as uts
+import inspect
 
 
 class Solver:
 
-    # x_grid, t_grid, miu_grid
+    # dimensions: l, x, t
     def __init__(self, t_grid=uts.t_diff, miu_grid=uts.l_grid, x_grid=uts.x_grid, rho0=uts.foo1, coupling=uts.c_def,
-                 diff=True,
+                 diff=True, tau=1/2,
                  potential=uts.potential_def,
                  boundary=None, model='Lieb-Liniger'):
         '''
@@ -26,14 +28,17 @@ class Solver:
         '''
         self.miu_grid, self.x_grid, self.t_grid = self.correct_l_x_t(miu_grid, x_grid, t_grid)
         self.coupling = coupling
-        self.rho0 = rho0
+        self.rho0 = self.get_rho0(rho0)
         self.boundary = self.correct_boundary(boundary)
         self.potential = self.calc_potential(potential)
         self.dx, self.dt, self.dl, self.steps_number = self.get_grid_spacing()
         self.diff = diff
+        self.tau = tau
         self.convergence = []
         self.model = model
         self.grid = self.create_initial_grid()
+        self.rho_thermal = 0
+
 
     def __str__(self):
         """
@@ -69,8 +74,9 @@ class Solver:
         self.grid = np.append(self.grid, other.grid, axis=-1)
 
     def correct_l_x_t(self, l, x, t):
-        '''
-        checking correctnes of the input and changes list into the numpy arrays
+        """
+        Checks the correctness of the input and converts lists to numpy arrays.
+
         Parameters
         ----------
         l : list or numpy array
@@ -79,22 +85,21 @@ class Solver:
 
         Returns
         -------
-        l, x, t as numpy arrays
-        '''
-        if isinstance(x, np.ndarray) == False:
-            x = np.array(x)
+        l, x, t : numpy arrays
+        """
+        try:
+            # Convert to numpy arrays if possible
+            l, x, t = map(np.asarray, (l, x, t))
+        except Exception as e:
+            raise TypeError(f"All inputs must be list-like or numpy arrays. Conversion failed: {e}")
 
-        if isinstance(t, np.ndarray) == False:
-            t = np.array(t)
-
-        if isinstance(l, np.ndarray) == False:
-            l = np.array(l)
-
+        # Ensure t grid size is sufficient
         if t.size < 2:
-            raise ValueError('t grid size cannot be smaller than 2')
+            raise ValueError("t grid size cannot be smaller than 2")
 
-        if l.ndim != 1 or x.ndim != 1 or t.ndim != 1:
-            raise ValueError('x, l and t should be 1D arrays')
+        # Check dimensions
+        if any(arr.ndim != 1 for arr in (l, x, t)):
+            raise ValueError("l, x, and t should all be 1D arrays")
 
         return l, x, t
 
@@ -112,7 +117,7 @@ class Solver:
         if boundary is None:
             return None
 
-        if isinstance(boundary, tuple) == False or len(boundary) != 2:
+        if not isinstance(boundary, tuple) or len(boundary) != 2:
             raise TypeError('boundary argument should be a tuple of lenght 2')
 
         return boundary
@@ -166,7 +171,8 @@ class Solver:
 
         """
         model_classes = {
-            'Lieb-Liniger': {'TBA': TBA_LiebLiniger, 'velocity': VelocityLiebLiniger, 'diffusion': DiffusionLiebLiniger}
+            'Lieb-Liniger': {'TBA': TBA_LiebLiniger, 'velocity': VelocityLiebLiniger, 'diffusion': DiffusionLiebLiniger,
+                             'RTA': Relaxation_time_approximation}
             # Add more models and calculations as needed
         }
 
@@ -179,6 +185,25 @@ class Solver:
         else:
             raise ValueError(f"Invalid model type: {self.model}")
 
+    def get_rho0(self, rho0):
+        try:
+            if inspect.isfunction(rho0):
+                # If rho0 is a function, call it with the appropriate arguments
+                rho0 = rho0(self.miu_grid[:, np.newaxis], self.x_grid[np.newaxis, :])
+                return rho0
+
+            elif isinstance(rho0, np.ndarray):
+                # If rho0 is already a numpy array, just return it
+                return rho0
+
+            else:
+                # Raise an exception if rho0 is neither a function nor a numpy array
+                raise ValueError("rho0 must be either a function or a numpy array.")
+
+        except Exception as e:
+            # Catch any errors that occur and re-raise them with additional context
+            raise ValueError(f"An error occurred while processing rho0: {e}")
+
     def create_initial_grid(self):
         '''
         Creates initial grid filled with initial conditions
@@ -190,11 +215,10 @@ class Solver:
 
         grid = np.zeros((self.miu_grid.size, self.x_grid.size, self.t_grid.size))
 
-        initial_state = self.rho0(self.miu_grid[:, np.newaxis], self.x_grid[np.newaxis, :])
-
-        grid[Ellipsis, 0] = initial_state
+        grid[Ellipsis, 0] = self.rho0
 
         return grid
+
 
     def create_matrix(self, time):
         '''
@@ -253,7 +277,7 @@ class Solver:
 
         return matrix
 
-    def diff_fixed_point_func(self, rho, rho_next, D, V, time):
+    def diff_fixed_point_func(self, rho, rho_next, D, V, time, collision_integral):
         '''
         functions utilizing fixed point iteration method for solving GHD with diffusion
         Parameters
@@ -270,22 +294,25 @@ class Solver:
         '''
         diff = rho_next
 
-        # D, V dimensions x, momenta
+        # D, V, I dimensions x, momenta
 
         Diffusion_op = np.einsum('xos, sx -> ox', D, uts.x_der(rho_next, self.dx), optimize=True)
 
         V_rho = np.einsum('xl, lx -> lx', V, rho_next, optimize=True)
 
+        collision_integral = collision_integral.T
+
         if self.potential is None:
 
-            foo = rho + self.dt[time] * (uts.x_der(Diffusion_op, self.dx) / 2 - uts.x_der(V_rho, self.dx))
+            foo = rho + self.dt[time] * (
+                        uts.x_der(Diffusion_op, self.dx) / 2 - uts.x_der(V_rho, self.dx) + collision_integral)
 
         else:
 
             foo = rho + self.dt[time] * (
                     uts.x_der(Diffusion_op, self.dx) / 2 - uts.x_der(V_rho, self.dx) + uts.x_der(self.potential,
                                                                                                  self.dx) * uts.lambda_der(
-                rho, self.dl))
+                rho, self.dl) + collision_integral)
 
         diff = np.abs(diff - foo).mean()
 
@@ -307,16 +334,19 @@ class Solver:
 
         rho = self.grid[Ellipsis, time]
 
-        Diff = self.get_model('diffusion', rho, self.miu_grid, self.coupling)
+        Diff = self.get_model('RTA', rho, self.miu_grid, self.coupling, self.potential,  self.tau)
 
         # Diff = CalcD(rho, self.l, self.c)
 
-        D, V = Diff.D, Diff.V  # dimensions N, x, momenta
+        D, V, self.rho_thermal = Diff.D, Diff.V, Diff.rho_thermal  # dimensions N, x, momenta
+
+
+        I = Diff.calc_collision_integral()
 
         diff = []
 
         for i in range(15):
-            rho_next, difference = self.diff_fixed_point_func(rho, rho_next, D, V, time)
+            rho_next, difference = self.diff_fixed_point_func(rho, rho_next, D, V, time, I)
 
             diff.append(difference)
 

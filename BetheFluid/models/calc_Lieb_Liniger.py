@@ -155,12 +155,14 @@ class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):
 
 class Relaxation_time_approximation(DiffusionLiebLiniger):
 
-    def __init__(self, rho, l, c, potential):
+    def __init__(self, rho, l, c, potential, tau):
         super().__init__(rho, l, c)
 
         self.potential = potential
-        self.C_operator = self.calc_C_operator()
-        self.C_matrix = self.calc_C_matrix()
+        self.tau = tau
+        self.rho_thermal = self.calc_rho_thermal()
+        # self.C_operator = self.calc_C_operator()
+        # self.C_matrix = self.calc_C_matrix()
 
     # lambda last dimension
     def calc_particle_density(self, rho_p):
@@ -229,17 +231,16 @@ class Relaxation_time_approximation(DiffusionLiebLiniger):
         C_matrix = np.zeros((self.rho.shape[0], 3, 3))
         for a in range(3):
             for b in range(3):
-
                 miu_b = self.miu_grid ** (b) / math.factorial(b)
                 miu_a = self.miu_grid ** (a) / math.factorial(a)
 
-                C_mat_elem = np.einsum('l, xlu, u -> x', miu_b, self.C_operator, miu_a) * self.dl**2
+                C_mat_elem = np.einsum('l, xlu, u -> x', miu_b, self.C_operator, miu_a) * self.dl ** 2
 
                 C_matrix[:, b, a] = C_mat_elem
 
         return C_matrix
 
-    def calc_linearized_collision_integral(self, tau):
+    def calc_linearized_collision_integral(self):
 
         delta = np.identity(self.miu_grid.size)[np.newaxis, Ellipsis]
         C_inv = np.linalg.inv(self.C_matrix)
@@ -247,16 +248,16 @@ class Relaxation_time_approximation(DiffusionLiebLiniger):
         sum_ab = np.zeros_like(self.C_operator)
         for a in range(3):
             for b in range(3):
-
                 miu_b = self.miu_grid ** (b) / math.factorial(b)
                 miu_a = self.miu_grid ** (a) / math.factorial(a)
 
                 C_inv_mat_elem = C_inv[:, b, a]
                 C_lambda = np.einsum('xlu, u -> xl', self.C_operator, miu_b) * self.dl
 
-                sum_ab += C_lambda[:, :, np.newaxis] * C_inv_mat_elem[:, np.newaxis, np.newaxis] * miu_a[np.newaxis, np.newaxis, :]
+                sum_ab += C_lambda[:, :, np.newaxis] * C_inv_mat_elem[:, np.newaxis, np.newaxis] * miu_a[np.newaxis,
+                                                                                                   np.newaxis, :]
 
-        colision_integral = 1 / tau * (sum_ab - delta / self.dl)
+        colision_integral = 1 / self.tau * (sum_ab - delta / self.dl)
 
         return colision_integral
 
@@ -283,9 +284,9 @@ class Relaxation_time_approximation(DiffusionLiebLiniger):
             density_calculated = self.calc_particle_density(rho_calculated)
             energy_calculated = self.calc_energy(rho_calculated)
 
-            residual_density = (density_calculated - target_density) / np.max(target_density)
-            residual_energy = (energy_calculated - target_energy) / np.max(target_energy)
-
+            residual_density = (density_calculated - target_density)
+            residual_energy = (energy_calculated - target_energy)
+            print(residual_density)
             return np.concatenate([residual_density.ravel(), residual_energy.ravel()])
 
         beta_0 = np.ones_like(self.rho[:, 0])
@@ -293,15 +294,30 @@ class Relaxation_time_approximation(DiffusionLiebLiniger):
         # Solve using root
         initial_guess = np.stack((beta_0, beta_1)).reshape(-1)
         result = root(equation_to_solve, initial_guess,
-                      method='hybr', tol=10 ** (-3))  # Here maybe it is worth considering the different methods
+                      method='hybr', tol=10 ** (-7))  # Here maybe it is worth considering the different methods
 
         if not result.success:
             raise ValueError(f"Root finding failed: {result.message}")
 
         return result.x.reshape(2, self.rho.shape[0])
 
+    def calc_rho_thermal(self):
+
+        params = self.calc_potentials_for_rho_boosted()
+
+        eps0 = params[0, :, np.newaxis] + params[1, :, np.newaxis] * self.miu_grid[np.newaxis, :] ** 2
+
+        eps = self.calc_equillibrium_state(eps0)
+
+        rho_thermal = self.calc_rho_from_eps(eps)
+
+        return rho_thermal
+
     def calc_collision_integral(self):
-        pass
+
+        colision_integral = 1 / self.tau * (self.rho_thermal - self.rho)
+
+        return colision_integral
 
 
 if __name__ == '__main__':
@@ -316,35 +332,34 @@ if __name__ == '__main__':
 
     rho = object.grid[:, :, 0]
 
-    relax = Relaxation_time_approximation(rho, object.miu_grid, object.coupling, object.potential)
+    relax = Relaxation_time_approximation(rho, object.miu_grid, object.coupling, object.potential, 5)
 
-    colision_int = relax.calc_linearized_collision_integral(5)
-
-    density_check = np.sum(colision_int, axis=1) * object.dl
-
-    momentum_check = np.sum(object.miu_grid[np.newaxis, :, np.newaxis] * colision_int, axis=1) * object.dl
-
-    energy_check = np.sum(object.miu_grid[np.newaxis, :, np.newaxis] ** 2 * colision_int, axis=1) * object.dl
-
-
-    colision_int_einv = np.linalg.eig(colision_int * object.dl)[0]
-
-    plt.hist(colision_int_einv[10])
-    plt.show()
-
-    # susceptibiliteis = relax.calc_potentials_for_rho_boosted()
+    # colision_int = relax.calc_linearized_collision_integral()
     #
-    # eps0 = susceptibiliteis[0, :, np.newaxis] + susceptibiliteis[1, :, np.newaxis] * object.miu_grid[np.newaxis, :] ** 2
+    # density_check = np.sum(colision_int, axis=1) * object.dl
     #
-    # eps = relax.calc_equillibrium_state(eps0)
+    # momentum_check = np.sum(object.miu_grid[np.newaxis, :, np.newaxis] * colision_int, axis=1) * object.dl
     #
-    # rho_boosted = relax.calc_rho_from_eps(eps)
+    # energy_check = np.sum(object.miu_grid[np.newaxis, :, np.newaxis] ** 2 * colision_int, axis=1) * object.dl
+    #
+    # colision_int_einv = np.linalg.eig(colision_int * object.dl)[0]
+    #
+    # plt.hist(colision_int_einv[10])
+    # plt.show()
 
-    # rho_energy = relax.calc_energy(rho)
-    # rho_boosted_energy = relax.calc_energy(rho_boosted)
-    #
-    # rho_density = relax.calc_particle_density(rho)
-    # rho_boosted_density = relax.calc_particle_density(rho_boosted)
+    susceptibiliteis = relax.calc_potentials_for_rho_boosted()
+
+    eps0 = susceptibiliteis[0, :, np.newaxis] + susceptibiliteis[1, :, np.newaxis] * object.miu_grid[np.newaxis, :] ** 2
+
+    eps = relax.calc_equillibrium_state(eps0)
+
+    rho_boosted = relax.calc_rho_from_eps(eps)
+
+    rho_energy = relax.calc_energy(rho.T)
+    rho_boosted_energy = relax.calc_energy(rho_boosted)
+
+    rho_density = relax.calc_particle_density(rho)
+    rho_boosted_density = relax.calc_particle_density(rho_boosted)
     #
     #
     # plt.plot(object.miu_grid, rho[0, :], '--', label='rho x=1')
