@@ -1,6 +1,7 @@
 import numpy as np
-from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, DiffusionLiebLiniger, \
-    Relaxation_time_approximation
+from BetheFluid.models.calc_Lieb_Liniger import Therodynamic_Limit_LiebLiniger, VelocityLiebLiniger, \
+    DiffusionLiebLiniger, \
+    Calc_Suceptibilities_Matrix, RTA_approximation
 from tqdm import tqdm
 import dill
 import BetheFluid.utils as uts
@@ -11,7 +12,7 @@ class Solver:
 
     # dimensions: l, x, t
     def __init__(self, t_grid=uts.t_diff, miu_grid=uts.l_grid, x_grid=uts.x_grid, rho0=uts.foo1, coupling=uts.c_def,
-                 diff=True, tau=1/2,
+                 diff=True, tau=1 / 2,
                  potential=uts.potential_def,
                  boundary=None, model='Lieb-Liniger'):
         '''
@@ -37,8 +38,8 @@ class Solver:
         self.convergence = []
         self.model = model
         self.grid = self.create_initial_grid()
-        self.rho_thermal = 0
-
+        self.susceptibility_matrix = Calc_Suceptibilities_Matrix(self.grid[Ellipsis,0], self.miu_grid, self.coupling,
+                                                                 self.potential, self.tau).susceptibilities_matrix
 
     def __str__(self):
         """
@@ -171,8 +172,9 @@ class Solver:
 
         """
         model_classes = {
-            'Lieb-Liniger': {'TBA': TBA_LiebLiniger, 'velocity': VelocityLiebLiniger, 'diffusion': DiffusionLiebLiniger,
-                             'RTA': Relaxation_time_approximation}
+            'Lieb-Liniger': {'TBA': Therodynamic_Limit_LiebLiniger, 'velocity': VelocityLiebLiniger,
+                             'diffusion': DiffusionLiebLiniger,
+                             'RTA': RTA_approximation}
             # Add more models and calculations as needed
         }
 
@@ -218,7 +220,6 @@ class Solver:
         grid[Ellipsis, 0] = self.rho0
 
         return grid
-
 
     def create_matrix(self, time):
         '''
@@ -305,7 +306,7 @@ class Solver:
         if self.potential is None:
 
             foo = rho + self.dt[time] * (
-                        uts.x_der(Diffusion_op, self.dx) / 2 - uts.x_der(V_rho, self.dx) + collision_integral)
+                    uts.x_der(Diffusion_op, self.dx) / 2 - uts.x_der(V_rho, self.dx) + collision_integral)
 
         else:
 
@@ -334,14 +335,14 @@ class Solver:
 
         rho = self.grid[Ellipsis, time]
 
-        Diff = self.get_model('RTA', rho, self.miu_grid, self.coupling, self.potential,  self.tau)
+        RTA_obj = self.get_model('RTA', rho, self.miu_grid, self.coupling, self.potential, self.tau,
+                                 self.susceptibility_matrix)
 
-        # Diff = CalcD(rho, self.l, self.c)
+        Diff = self.get_model('diffusion', rho, self.miu_grid, self.coupling)
 
-        D, V, self.rho_thermal = Diff.D, Diff.V, Diff.rho_thermal  # dimensions N, x, momenta
+        I = RTA_obj.collision_integral
 
-
-        I = Diff.calc_collision_integral()
+        D, V = Diff.D, Diff.V  # dimensions N, x, momenta
 
         diff = []
 
