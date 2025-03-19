@@ -1,7 +1,7 @@
 import numpy as np
-from BetheFluid.models.calc_Lieb_Liniger import Therodynamic_Limit_LiebLiniger, VelocityLiebLiniger, \
+from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, \
     DiffusionLiebLiniger, \
-    Calc_Suceptibilities_Matrix, RTA_approximation
+    Calc_potentials_Matrix, RTA_approximation
 from tqdm import tqdm
 import dill
 import BetheFluid.utils as uts
@@ -38,8 +38,8 @@ class Solver:
         self.convergence = []
         self.model = model
         self.grid = self.create_initial_grid()
-        self.susceptibility_matrix = Calc_Suceptibilities_Matrix(self.grid[Ellipsis,0], self.miu_grid, self.coupling,
-                                                                 self.potential, self.tau).susceptibilities_matrix
+        self.potentials_matrix = Calc_potentials_Matrix(self.grid[Ellipsis,0], self.miu_grid, self.coupling,
+                                                        self.potential, self.tau).potentials_matrix
 
     def __str__(self):
         """
@@ -172,7 +172,7 @@ class Solver:
 
         """
         model_classes = {
-            'Lieb-Liniger': {'TBA': Therodynamic_Limit_LiebLiniger, 'velocity': VelocityLiebLiniger,
+            'Lieb-Liniger': {'TBA': TBA_LiebLiniger, 'velocity': VelocityLiebLiniger,
                              'diffusion': DiffusionLiebLiniger,
                              'RTA': RTA_approximation}
             # Add more models and calculations as needed
@@ -336,7 +336,7 @@ class Solver:
         rho = self.grid[Ellipsis, time]
 
         RTA_obj = self.get_model('RTA', rho, self.miu_grid, self.coupling, self.potential, self.tau,
-                                 self.susceptibility_matrix)
+                                 self.potentials_matrix)
 
         Diff = self.get_model('diffusion', rho, self.miu_grid, self.coupling)
 

@@ -7,13 +7,16 @@ from abc import ABC, abstractmethod
 ###############################################################################################################
 
 class TBA(ABC):
-    def __init__(self, rho, l, c):
+    def __init__(self, rho, l, c, potential=0):
         self.rho = self.calc_rho(rho)
         self.miu_grid = l
         self.coupling = c
+        self.potential = potential
         self.dl = np.diff(self.miu_grid).mean()
         self.T = self.create_T()
         self.n, self.rho_tot = self.calc_n_rho_tot()
+        self.operator = self.get_operator(n=self.n)
+
 
 
     def calc_rho(self, rho):
@@ -40,21 +43,20 @@ class TBA(ABC):
     def calc_n_rho_tot(self):
         pass
 
-class CalcV(TBA):
-
-    def __init__(self, rho, l, c):
-        super().__init__(rho, l, c)
-        self.operator = self.get_operator(n=self.n)
-        self.V = self.get_V()
-
     @abstractmethod
     def get_operator(self):
         pass
 
+class CalcV(TBA):
+
+    def __init__(self, rho, l, c, potential=0):
+        super().__init__(rho, l, c, potential)
+
+        self.V = self.get_V()
+
     @abstractmethod
     def get_V(self):
         pass
-
 
 
 class CalcD(CalcV):
