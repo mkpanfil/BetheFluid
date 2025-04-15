@@ -1,7 +1,7 @@
 import numpy as np
 from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, \
     DiffusionLiebLiniger, \
-    Calc_potentials_Matrix, RTA_approximation
+    Calc_Suceptibilities_Matrix, RTA_approximation
 from tqdm import tqdm
 import dill
 import BetheFluid.utils as uts
