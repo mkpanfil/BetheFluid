@@ -93,7 +93,7 @@ class VelocityLiebLiniger(CalcV, Therodynamic_Limit_LiebLiniger):
 
 
 
-class TBA_Lieb_liniger(VelocityLiebLiniger):
+class TBA_LiebLiniger(VelocityLiebLiniger):
 
     def __init__(self, rho, l, c, potential):
         super().__init__(rho, l, c)
@@ -211,7 +211,7 @@ class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):
         return D
 
 
-class Calc_Suceptibilities_Matrix(TBA_Lieb_liniger):
+class Calc_Suceptibilities_Matrix(TBA_LiebLiniger):
 
     def __init__(self, rho, l, c, potential, tau):
         super().__init__(rho, l, c, potential)
@@ -311,7 +311,7 @@ class Calc_Suceptibilities_Matrix(TBA_Lieb_liniger):
 
 
 
-class RTA_approximation(TBA_Lieb_liniger):
+class RTA_approximation(TBA_LiebLiniger):
     def __init__(self, rho, l, c, potential, tau, susceptibility_matrix):
         super().__init__(rho, l, c, potential)
 
