@@ -38,8 +38,8 @@ class Solver:
         self.convergence = []
         self.model = model
         self.grid = self.create_initial_grid()
-        self.potentials_matrix = Calc_potentials_Matrix(self.grid[Ellipsis,0], self.miu_grid, self.coupling,
-                                                        self.potential, self.tau).potentials_matrix
+        self.potentials_matrix = Calc_Suceptibilities_Matrix(self.grid[Ellipsis,0], self.miu_grid, self.coupling,
+                                                        self.potential, self.tau).susceptibilities_matrix
 
     def __str__(self):
         """
