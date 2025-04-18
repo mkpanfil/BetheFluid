@@ -13,7 +13,7 @@ class Observable:
         self.solver_object = self.get_object(Solver_object)
         # dimensions: l, x, t
         self.TBA_object = self.solver_object.get_model('TBA', self.solver_object.grid, self.solver_object.miu_grid,
-                                                       self.solver_object.coupling)
+                                                       self.solver_object.coupling, self.solver_object.potential)
 
         self.T = self.TBA_object.T
         self.rho_tot = np.einsum('xlt -> lxt', self.TBA_object.rho_tot)
