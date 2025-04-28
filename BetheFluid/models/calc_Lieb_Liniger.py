@@ -2,8 +2,8 @@ import numpy as np
 import math
 from scipy.optimize import root
 from BetheFluid.calc import TBA, CalcV, CalcD
-from scipy.interpolate import RegularGridInterpolator, LinearNDInterpolator
-from scipy.spatial import Delaunay
+from scipy.interpolate import NearestNDInterpolator
+
 import warnings
 class Therodynamic_Limit_LiebLiniger(TBA):
     def create_T(self):
@@ -262,11 +262,6 @@ class Calc_Suceptibilities_Matrix(TBA_LiebLiniger):
 
         return arrays_for_matrix
 
-    import numpy as np
-    from scipy.interpolate import LinearNDInterpolator
-    from scipy.spatial import Delaunay
-    import warnings
-
     def calculate_susceptibilities_matrix(self):
         transf_density, transf_energy, susceptibilities = self.calc_potentials_for_rho_boosted()
 
@@ -276,31 +271,16 @@ class Calc_Suceptibilities_Matrix(TBA_LiebLiniger):
         # assert not np.isnan(susceptibilities).any(), "NaNs in susceptibilities"
 
         points = np.column_stack((transf_density, transf_energy))
-        # tri = Delaunay(points)
-        #
-        # # Validate triangulation
-        # if tri.nsimplex == 0:
-        #     raise ValueError("Degenerate triangulation - no simplices formed")
 
         # Reuse triangulation for both interpolators
-        interp0 = LinearNDInterpolator(points, susceptibilities[0, :], fill_value=44)
-        interp1 = LinearNDInterpolator(points, susceptibilities[1, :], fill_value=44)
+        #interp0 = LinearNDInterpolator(points, susceptibilities[0, :], fill_value=44)
+        #interp1 = LinearNDInterpolator(points, susceptibilities[1, :], fill_value=44)
+        interp0 = NearestNDInterpolator(points, susceptibilities[0, :])
+        interp1 = NearestNDInterpolator(points, susceptibilities[1, :])
 
-        def interpolator(new_density, new_energy, check_convex_hull=True, return_mask=False):
+        def interpolator(new_density, new_energy):
             points_new = np.column_stack((new_density, new_energy))
 
-            # Check for convex hull violations
-            # simplex_ids = tri.find_simplex(points_new)
-            # outside_mask = simplex_ids == -1  # -1 means outside convex hull
-            #
-            # if check_convex_hull and np.any(outside_mask):
-            #     outside_indices = np.where(outside_mask)[0]
-            #     warnings.warn(
-            #         f"{len(outside_indices)} points lie outside convex hull (indices: {outside_indices.tolist()})",
-            #         RuntimeWarning
-            #     )
-
-            # Perform interpolation
             s0 = interp0(points_new)
             s1 = interp1(points_new)
             result = np.stack((s0, s1), axis=-1)
