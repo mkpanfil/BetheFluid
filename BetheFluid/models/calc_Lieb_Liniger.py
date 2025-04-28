@@ -233,7 +233,7 @@ class Calc_Potentials_Matrix(TBA_LiebLiniger):
             params = params.reshape(2, self.rho.shape[0])
 
             # Calculate epsilon
-            eps0 = params[0, :, np.newaxis] + params[1, :, np.newaxis] * self.miu_grid[np.newaxis, :] ** 2
+            eps0 = params[0, :, np.newaxis] + 0.5 * params[1, :, np.newaxis] * self.miu_grid[np.newaxis, :] ** 2
 
             eps = self.calc_equillibrium_state(eps0)
 
@@ -333,21 +333,27 @@ class RTA_approximation(TBA_LiebLiniger):
         return C_matrix
 
     def calc_charges(self):
-        transf_density = self.calc_particle_density(self.rho)
+        # transf_density = self.calc_particle_density(self.rho)
 
+        density = self.calc_particle_density(self.rho)
         momentum = self.calc_momentum(self.rho)
         energy = self.calc_energy(self.rho)
 
-        transf_energy = energy - momentum ** 2 / (2 * transf_density)
+        transf_energy = energy - momentum ** 2 / (2 * density)
 
-        return (transf_density, transf_energy)
-
+        #return (transf_density, transf_energy)
+        return (density, momentum, transf_energy)
 
     def calc_rho_thermal(self):
 
-        params = self.potentials_matrix(*self.charges)
+        params = self.potentials_matrix(self.charges[0], self.charges[2])
+        u = self.charges[1]/self.charges[0]
 
-        eps0 = params[:, 0, np.newaxis] + params[:, 1, np.newaxis] * self.miu_grid[np.newaxis, :] ** 2
+        beta0 = params[:, 0] + 0.5 * params[:, 1] * u**2
+        beta1 = - params[:, 1] * u
+        beta2 = params[:, 1]
+        eps0 = beta0[:, np.newaxis] + beta1[:, np.newaxis] * self.miu_grid[np.newaxis, :]
+        eps0 += 0.5 * beta2[:, np.newaxis] * self.miu_grid[np.newaxis, :] ** 2
 
         eps = self.calc_equillibrium_state(eps0)
 
