@@ -1,7 +1,9 @@
+from typing import Any
+
 import numpy as np
 from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, \
     DiffusionLiebLiniger, \
-    Calc_Suceptibilities_Matrix, RTA_approximation
+    Calc_Potentials_Matrix, RTA_approximation
 from tqdm import tqdm
 import dill
 import BetheFluid.utils as uts
@@ -12,7 +14,7 @@ class Solver:
 
     # dimensions: l, x, t
     def __init__(self, t_grid=uts.t_diff, miu_grid=uts.l_grid, x_grid=uts.x_grid, rho0=uts.foo1, coupling=uts.c_def,
-                 diff=True, tau=1 / 2,
+                 diff=True, tau=1/2,
                  potential=uts.potential_def,
                  boundary=None, model='Lieb-Liniger'):
         '''
@@ -38,8 +40,8 @@ class Solver:
         self.convergence = []
         self.model = model
         self.grid = self.create_initial_grid()
-        self.potentials_matrix = Calc_Suceptibilities_Matrix(self.grid[Ellipsis,0], self.miu_grid, self.coupling,
-                                                        self.potential, self.tau).susceptibilities_matrix
+        self.potentials_matrix = Calc_Potentials_Matrix(self.grid[Ellipsis,0], self.miu_grid, self.coupling,
+                                                        self.potential, self.tau).potentials_matrix
 
     def __str__(self):
         """

@@ -211,13 +211,13 @@ class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):
         return D
 
 
-class Calc_Suceptibilities_Matrix(TBA_LiebLiniger):
+class Calc_Potentials_Matrix(TBA_LiebLiniger):
 
     def __init__(self, rho, l, c, potential, tau):
         super().__init__(rho, l, c, potential)
 
         self.tau = tau
-        self.susceptibilities_matrix = self.calculate_susceptibilities_matrix()
+        self.potentials_matrix = self.calculate_potentials_matrix()
 
 
     def calc_potentials_for_rho_boosted(self):
@@ -262,8 +262,8 @@ class Calc_Suceptibilities_Matrix(TBA_LiebLiniger):
 
         return arrays_for_matrix
 
-    def calculate_susceptibilities_matrix(self):
-        transf_density, transf_energy, susceptibilities = self.calc_potentials_for_rho_boosted()
+    def calculate_potentials_matrix(self):
+        transf_density, transf_energy, potentials = self.calc_potentials_for_rho_boosted()
 
         # Check for NaNs in input data
         # assert not np.isnan(transf_density).any(), "NaNs in transf_density"
@@ -275,8 +275,8 @@ class Calc_Suceptibilities_Matrix(TBA_LiebLiniger):
         # Reuse triangulation for both interpolators
         #interp0 = LinearNDInterpolator(points, susceptibilities[0, :], fill_value=44)
         #interp1 = LinearNDInterpolator(points, susceptibilities[1, :], fill_value=44)
-        interp0 = NearestNDInterpolator(points, susceptibilities[0, :])
-        interp1 = NearestNDInterpolator(points, susceptibilities[1, :])
+        interp0 = NearestNDInterpolator(points, potentials[0, :])
+        interp1 = NearestNDInterpolator(points, potentials[1, :])
 
         def interpolator(new_density, new_energy):
             points_new = np.column_stack((new_density, new_energy))
@@ -292,11 +292,11 @@ class Calc_Suceptibilities_Matrix(TBA_LiebLiniger):
 
 
 class RTA_approximation(TBA_LiebLiniger):
-    def __init__(self, rho, l, c, potential, tau, susceptibility_matrix):
+    def __init__(self, rho, l, c, potential, tau, potentials_matrix):
         super().__init__(rho, l, c, potential)
 
         self.tau = tau
-        self.susceptibility_matrix = susceptibility_matrix
+        self.potentials_matrix = potentials_matrix
         self.charges = self.calc_charges()
         self.C_operator = self.calc_C_operator()
         self.C_matrix = self.calc_C_matrix()
@@ -345,7 +345,7 @@ class RTA_approximation(TBA_LiebLiniger):
 
     def calc_rho_thermal(self):
 
-        params = self.susceptibility_matrix(*self.charges)
+        params = self.potentials_matrix(*self.charges)
 
         eps0 = params[:, 0, np.newaxis] + params[:, 1, np.newaxis] * self.miu_grid[np.newaxis, :] ** 2
 
@@ -401,9 +401,9 @@ if __name__ == '__main__':
 
     rho = object.grid[:, :, 0]
 
-    relax = Calc_Suceptibilities_Matrix(rho, object.miu_grid, object.coupling, object.potential, 5)
+    relax = Calc_Potentials_Matrix(rho, object.miu_grid, object.coupling, object.potential, 5)
 
-    sus_matrix = relax.calculate_susceptibilities_matrix()
+    sus_matrix = relax.calculate_potentials_matrix()
 
     sus_evaluation = sus_matrix(0.17, 1.2)
 
