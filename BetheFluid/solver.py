@@ -303,6 +303,7 @@ class Solver:
 
         V_rho = np.einsum('xl, lx -> lx', V, rho_next, optimize=True)
 
+        #transpose the collision_integral to conform with the convention in the Solver
         collision_integral = collision_integral.T
 
         if self.potential is None:
