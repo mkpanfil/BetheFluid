@@ -359,6 +359,19 @@ class RTA_approximation(TBA_LiebLiniger):
 
         rho_thermal = self.calc_rho_from_eps(eps)
 
+        #verify whether the thermal state has correct charges
+        density_thermal = self.calc_particle_density(rho_thermal)
+        #momentum_thermal = self.calc_momentum(rho_thermal)
+        energy_thermal = self.calc_energy(rho_thermal)
+
+        error_density = np.max(np.abs((density_thermal - self.charges[0])/self.charges[0]))
+        #error_momentum = np.max(np.abs(momentum_thermal - self.charges[1]))
+        error_energy = np.max(np.abs((energy_thermal - self.charges[2]) / self.charges[2]))
+
+        error = max(error_density, error_energy)
+        if error > 0.01:
+            print("Error in computing the thermal state exceeds 1%")
+
         return rho_thermal
 
 
