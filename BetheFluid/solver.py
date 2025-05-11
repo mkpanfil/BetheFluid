@@ -1,7 +1,7 @@
-from typing import Any
+
 
 import numpy as np
-from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger, VelocityLiebLiniger, \
+from BetheFluid.models.calc_Lieb_Liniger import TBA_LiebLiniger,  \
     DiffusionLiebLiniger, \
     Calc_Potentials_Matrix, RTA_approximation
 from tqdm import tqdm
@@ -174,7 +174,7 @@ class Solver:
 
         """
         model_classes = {
-            'Lieb-Liniger': {'TBA': TBA_LiebLiniger, 'velocity': VelocityLiebLiniger,
+            'Lieb-Liniger': {'TBA': TBA_LiebLiniger,
                              'diffusion': DiffusionLiebLiniger,
                              'RTA': RTA_approximation}
             # Add more models and calculations as needed
@@ -240,7 +240,7 @@ class Solver:
 
         # calculating V using class CalcV
 
-        V = self.get_model('velocity', rho, self.miu_grid, self.coupling).V
+        V = self.get_model('TBA', rho, self.miu_grid, self.coupling).V
 
         # changing indices back to proper order
 

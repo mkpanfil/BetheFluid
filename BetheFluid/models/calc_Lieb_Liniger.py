@@ -4,8 +4,7 @@ from scipy.optimize import root
 from BetheFluid.calc import TBA, CalcV, CalcD
 from scipy.interpolate import NearestNDInterpolator
 
-import warnings
-class Therodynamic_Limit_LiebLiniger(TBA):
+class TBA_LiebLiniger(TBA):
     def create_T(self):
         '''
         Returns
@@ -34,11 +33,6 @@ class Therodynamic_Limit_LiebLiniger(TBA):
 
         return n, rho_tot
 
-
-class VelocityLiebLiniger(CalcV, Therodynamic_Limit_LiebLiniger):
-    '''
-    Class calculating effective velocity of given state rho
-    '''
 
     def get_operator(self, n):
         '''
@@ -91,15 +85,6 @@ class VelocityLiebLiniger(CalcV, Therodynamic_Limit_LiebLiniger):
 
         return V
 
-
-
-class TBA_LiebLiniger(VelocityLiebLiniger):
-
-    def __init__(self, rho, l, c, potential):
-        super().__init__(rho, l, c)
-
-        self.potential = potential
-
     def calc_particle_density(self, rho_p):
         integrated_density = np.sum(rho_p, axis=-1) * self.dl
 
@@ -113,11 +98,15 @@ class TBA_LiebLiniger(VelocityLiebLiniger):
         return integrated_momentum
 
     def calc_energy(self, rho_p):
-        potential = np.einsum('ij -> ji', self.potential)
 
-        energy = (self.miu_grid[np.newaxis, :] ** 2 + potential) * rho_p
+        if self.potential is not None:
+            potential = np.einsum('ij -> ji', self.potential)
 
-        # energy = (self.miu_grid[np.newaxis, :] ** 2) * rho_p
+            energy = (self.miu_grid[np.newaxis, :] ** 2 + potential) * rho_p
+
+        else:
+
+            energy = (self.miu_grid[np.newaxis, :] ** 2) * rho_p
 
         integrated_energy = np.sum(energy, axis=-1) * self.dl
 
@@ -149,7 +138,7 @@ class TBA_LiebLiniger(VelocityLiebLiniger):
 
 
 
-class DiffusionLiebLiniger(VelocityLiebLiniger, CalcD):
+class DiffusionLiebLiniger(TBA_LiebLiniger, CalcD):
     '''
     Class calculating diffusion operator for given state rho, derived class of CalcV
     '''
@@ -265,16 +254,9 @@ class Calc_Potentials_Matrix(TBA_LiebLiniger):
     def calculate_potentials_matrix(self):
         transf_density, transf_energy, potentials = self.calc_potentials_for_rho_boosted()
 
-        # Check for NaNs in input data
-        # assert not np.isnan(transf_density).any(), "NaNs in transf_density"
-        # assert not np.isnan(transf_energy).any(), "NaNs in transf_energy"
-        # assert not np.isnan(susceptibilities).any(), "NaNs in susceptibilities"
-
         points = np.column_stack((transf_density, transf_energy))
 
         # Reuse triangulation for both interpolators
-        #interp0 = LinearNDInterpolator(points, susceptibilities[0, :], fill_value=44)
-        #interp1 = LinearNDInterpolator(points, susceptibilities[1, :], fill_value=44)
         interp0 = NearestNDInterpolator(points, potentials[0, :])
         interp1 = NearestNDInterpolator(points, potentials[1, :])
 
@@ -403,8 +385,6 @@ class RTA_approximation(TBA_LiebLiniger):
         return colision_integral
 
 
-### Now the onlny thing to do is to change the Solver object, to generate the class RTA in the loop for the next
-### time step
 
 if __name__ == '__main__':
     from BetheFluid import solver

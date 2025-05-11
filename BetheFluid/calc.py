@@ -16,6 +16,7 @@ class TBA(ABC):
         self.T = self.create_T()
         self.n, self.rho_tot = self.calc_n_rho_tot()
         self.operator = self.get_operator(n=self.n)
+        self.V = self.get_V()
 
 
 
