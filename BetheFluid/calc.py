@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 ###############################################################################################################
 
 class TBA(ABC):
-    def __init__(self, rho, l, c, potential=0):
+    def __init__(self, rho, l, c, potential=0, perform_velocity_calc=True):
         self.rho = self.calc_rho(rho)
         self.miu_grid = l
         self.coupling = c
@@ -15,6 +15,7 @@ class TBA(ABC):
         self.dl = np.diff(self.miu_grid).mean()
         self.T = self.create_T()
         self.n, self.rho_tot = self.calc_n_rho_tot()
+        self.perform_velocity_calc = perform_velocity_calc
         self.operator = self.get_operator(n=self.n)
         self.V = self.get_V()
 

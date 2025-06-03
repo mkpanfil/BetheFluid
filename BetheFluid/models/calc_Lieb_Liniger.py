@@ -44,6 +44,9 @@ class TBA_LiebLiniger(TBA):
 
         # dimensions : T(l,u) , n(x, u) -> Tn (x,l,u)
         # Tn = self.T[np.newaxis, :, :] * self.n[:, np.newaxis, :]
+        if self.perform_velocity_calc == False:
+
+            return False
 
         Tn = np.einsum('lu, xu... -> xlu...', self.T, n, optimize=True)
 
@@ -74,6 +77,10 @@ class TBA_LiebLiniger(TBA):
         V : numpy array
         '''
         # dimensions x, l
+
+        if self.perform_velocity_calc == False:
+
+            return False
 
         u = 2 * self.miu_grid
 

@@ -8,17 +8,18 @@ from BetheFluid.solver import Solver
 
 class Observable:
 
-    def __init__(self, Solver_object: Union[Solver, str]):
+    def __init__(self, Solver_object: Union[Solver, str], sl=(None, None, 1)):
 
-        self.solver_object = self.get_object(Solver_object)
         # dimensions: l, x, t
+        self.solver_object = self.get_object(Solver_object)
         self.TBA_object = self.solver_object.get_model('TBA', self.solver_object.grid, self.solver_object.miu_grid,
-                                                       self.solver_object.coupling, self.solver_object.potential)
+                                                       self.solver_object.coupling, self.solver_object.potential, False)
 
         self.T = self.TBA_object.T
         self.rho_tot = np.einsum('xlt -> lxt', self.TBA_object.rho_tot)
         self.n = np.einsum('xlt -> lxt', self.TBA_object.n)
         self.rho_h = self.calc_rho_h()
+        self.slice_grid(sl)
 
     def get_object(self, inp: Union[Solver, str]) -> Solver:
         '''
@@ -46,6 +47,28 @@ class Observable:
         rho_h = self.rho_tot - self.solver_object.grid
 
         return rho_h
+
+    def slice_grid(self, sl):
+
+        sl = slice(*sl)
+
+        self.solver_object.t_grid = self.solver_object.t_grid[sl]
+        self.solver_object.convergence = self.solver_object.convergence[sl]
+
+
+        self.solver_object.dt = self.solver_object.dt[sl]
+
+        slices = [slice(None)] * self.solver_object.grid.ndim
+        slices[-1] = sl
+
+        self.solver_object.grid = self.solver_object.grid[tuple(slices)]
+
+        self.rho_tot = self.rho_tot[tuple(slices)]
+        self.rho_h = self.rho_h[tuple(slices)]
+        self.n = self.n[tuple(slices)]
+
+
+
 
     def __calc_template(self, observable, option):
 
