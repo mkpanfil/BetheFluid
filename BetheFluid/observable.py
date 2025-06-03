@@ -111,7 +111,7 @@ class Observable:
                                                                                                        self.rho_h)
         return self.__calc_template(S_grid, option)
 
-    def __plot_template(self, observable, option='local', frames=(0, -1), path=None, name='', style='-'):
+    def __plot_template(self, observable, option='local', frames=(0, -1), path=None, name='', style='-', legend=True):
 
         main_options_dictionairy = {
             'n': {
@@ -149,28 +149,31 @@ class Observable:
                      )
             plt.xlabel('time')
             plt.ylabel(option_mapping[option]['y_label'])
-            plt.show()
+            #plt.show()
 
         else:
             for item in frames:
-                plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, item], style,
+                if legend:
+                    plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, item], style,
                          label='{} t = {}'.format(name, round(self.solver_object.t_grid[item], 3)))
+                else:
+                    plt.plot(option_mapping[option]['x_axis'], option_mapping[option]['y_axis'][Ellipsis, item], style)
             plt.xlabel(option_mapping[option]['x_label'])
             plt.ylabel(option_mapping[option]['y_label'])
             plt.legend()
-            plt.show()
+            #plt.show()
 
         if path is not None:
             plt.savefig(path)
 
-    def plot_n(self, option='local', frames=(0, -1), path=None, name='', style='-'):
+    def plot_n(self, option='local', frames=(0, -1), path=None, name='', style='-', legend=True):
 
-        self.__plot_template(observable='n', option=option, frames=frames, path=path, name=name, style=style)
+        self.__plot_template(observable='n', option=option, frames=frames, path=path, name=name, style=style, legend=legend)
 
-    def plot_energy(self, option='total', frames=(0, -1), path=None, name='', style='-'):
+    def plot_energy(self, option='total', frames=(0, -1), path=None, name='', style='-', legend=True):
 
-        self.__plot_template(observable='energy', option=option, frames=frames, path=path, name=name, style=style)
+        self.__plot_template(observable='energy', option=option, frames=frames, path=path, name=name, style=style, legend=legend)
 
-    def plot_entropy(self, option='total', frames=(0, -1), path=None, name='', style='-'):
+    def plot_entropy(self, option='total', frames=(0, -1), path=None, name='', style='-', legend=True):
 
-        self.__plot_template(observable='entropy', option=option, frames=frames, path=path, name=name, style=style)
+        self.__plot_template(observable='entropy', option=option, frames=frames, path=path, name=name, style=style, legend=legend)
