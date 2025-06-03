@@ -52,10 +52,11 @@ class Solver:
             'time grid': 'Length: {}, average interval {}, final step {}'.format(self.t_grid.size, np.mean(self.dt),
                                                                                  self.t_grid[-1]),
             'space grid': 'Length: {}, average interval {}, final step {}'.format(self.x_grid.size,
-                                                                                  np.mean(self.x_grid),
+                                                                                  np.mean(self.dx),
                                                                                   self.x_grid[-1]),
 
-            'diffusion': self.diff
+            'diffusion': self.diff,
+            'RTA tau': self.tau
         }
 
         printed_informations = '\n'.join([f"{key}: {value}" for key, value in informations.items()])
